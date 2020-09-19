@@ -2,3 +2,4 @@
 /veloren
 settings.toml
 data
+*.log

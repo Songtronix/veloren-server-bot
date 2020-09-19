@@ -218,24 +218,33 @@ async fn branch(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
 }
 
 #[command]
-#[description = "Stop the Veloren server."]
-async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
+#[description = "Sends you the details to aquire the logs."]
+async fn logs(ctx: &Context, msg: &Message) -> CommandResult {
     let data = ctx.data.read().await;
-
-    let mut server = match data.get::<Server>() {
-        Some(server) => server.lock().await,
+    let settings = match data.get::<Settings>() {
+        Some(settings) => settings.lock().await,
         None => {
             msg.channel_id
-                .say(&ctx.http, "Couldn't aquire server information.")
+                .say(&ctx, "There was a problem getting the settings :/")
                 .await?;
             return Ok(());
         }
     };
 
-    server.stop().await;
-
-    msg.channel_id
-        .say(&ctx.http, "Stopped the Veloren Server.")
+    msg.author
+        .dm(&ctx, |m| {
+            m.content(
+                MessageBuilder::new()
+                    .push_bold_line("Keep these credentials secure!")
+                    .push_bold("Username: ")
+                    .push_line("Bot")
+                    .push_bold("Password: ")
+                    .push_line(&settings.web_password)
+                    .push_bold("Url: ")
+                    .push_line(&settings.address)
+                    .build(),
+            )
+        })
         .await?;
 
     Ok(())
@@ -272,6 +281,30 @@ async fn start(ctx: &Context, msg: &Message) -> CommandResult {
             &ctx.http,
             "Started Veloren Server. Check with `status` for its progress.",
         )
+        .await?;
+
+    Ok(())
+}
+
+#[command]
+#[description = "Stop the Veloren server."]
+async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
+    let data = ctx.data.read().await;
+
+    let mut server = match data.get::<Server>() {
+        Some(server) => server.lock().await,
+        None => {
+            msg.channel_id
+                .say(&ctx.http, "Couldn't aquire server information.")
+                .await?;
+            return Ok(());
+        }
+    };
+
+    server.stop().await;
+
+    msg.channel_id
+        .say(&ctx.http, "Stopped the Veloren Server.")
         .await?;
 
     Ok(())

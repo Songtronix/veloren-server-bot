@@ -15,6 +15,8 @@ pub struct Settings {
     pub owner: u64,
     /// Command prefix
     pub prefix: String,
+    /// The Password to access the logs.
+    pub web_password: String,
     /// Branch to compile
     branch: String,
     /// Server's address to be advertised in status cmd.
@@ -29,6 +31,7 @@ impl Default for Settings {
             token: String::from("DISCORD_BOT_TOKEN_HERE"),
             owner: 999999999,
             prefix: String::from("~"),
+            web_password: String::from("WEB_LOGS_PASSWORD_HERE"),
             branch: String::from("master"),
             address: String::from("SERVER_ADDRESS_HERE"),
             admins: HashSet::new(),

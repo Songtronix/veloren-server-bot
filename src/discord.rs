@@ -42,7 +42,7 @@ impl EventHandler for Handler {
 struct Info;
 
 #[group]
-#[commands(start, restart, stop, settings, db, branch)]
+#[commands(start, stop, restart, settings, db, branch, logs)]
 #[checks(Admin)]
 #[description = "All veloren server related commands."]
 struct Admin;
