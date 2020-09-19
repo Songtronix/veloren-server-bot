@@ -4,6 +4,7 @@ mod checks;
 mod commands;
 /// discord setup
 mod discord;
+mod logger;
 /// Veloren Server handling
 mod server;
 /// Bot settings
@@ -17,11 +18,7 @@ use tokio::process::Command;
 
 #[tokio::main(core_threads = 2)]
 async fn main() -> Result<()> {
-    // Init logging
-    if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "info");
-    }
-    env_logger::init();
+    logger::init()?;
 
     let settings = match Settings::new() {
         Ok(settings) => settings,

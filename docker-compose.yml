@@ -11,5 +11,19 @@ services:
     volumes:
       - "./data/veloren:/veloren"
       - "./data/settings:/data"
+      - logs:/data/logs
     environment:
       - BOT_SETTINGS=data/settings.toml
+      - BOT_LOGS=data/logs/bot.log
+  frontail:
+    image: mthenw/frontail
+    container_name: frontail
+    ports:
+      - "9001:9001"
+    restart: on-failure:0
+    volumes:
+      - "logs:/logs"
+    command: /logs/bot.log
+
+volumes:
+  logs:
