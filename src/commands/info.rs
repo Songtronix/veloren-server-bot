@@ -7,13 +7,15 @@ use serenity::{
 
 use crate::{server::Server, settings::Settings};
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[command]
 #[description = "Explains what this bot is about."]
 async fn about(ctx: &Context, msg: &Message) -> CommandResult {
     msg.channel_id
         .send_message(&ctx.http, |m| {
             m.embed(|e| {
-                e.title("Veloren Server Bot");
+                e.title(format!("Veloren Server Bot v{}", VERSION));
                 e.description(
                     MessageBuilder::new()
                         .push("written by ")

@@ -16,7 +16,7 @@ use server::Server;
 use settings::Settings;
 use tokio::process::Command;
 
-#[tokio::main(core_threads = 2)]
+#[tokio::main(core_threads = 4)]
 async fn main() -> Result<()> {
     logger::init()?;
 

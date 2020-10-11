@@ -15,6 +15,7 @@ pub enum ServerStatus {
     Updating,
     Compiling,
     Online,
+    Error,
 }
 
 impl std::fmt::Display for ServerStatus {
@@ -24,6 +25,7 @@ impl std::fmt::Display for ServerStatus {
             ServerStatus::Updating => write!(f, "Updating..."),
             ServerStatus::Compiling => write!(f, "Compiling..."),
             ServerStatus::Online => write!(f, "Online"),
+            ServerStatus::Error => write!(f, "Failed"),
         }
     }
 }
@@ -54,7 +56,7 @@ impl Server {
         })
     }
 
-    pub async fn run(&mut self, branch: &str) {
+    async fn run(&mut self, branch: &str) {
         if self.task.is_none() {
             let (send, recv) = mpsc::unbounded_channel();
             self.reporter = Some(recv);
@@ -77,7 +79,7 @@ impl Server {
         self.run(branch).await;
     }
 
-    pub async fn cancel(&mut self) {
+    async fn cancel(&mut self) {
         if let Some(task) = self.task.take() {
             task.cancel().await;
             self.status = ServerStatus::Offline;
@@ -104,7 +106,11 @@ impl Server {
         report.send(ServerStatus::Compiling)?;
         Self::run_compile().await?;
         report.send(ServerStatus::Online)?;
-        Self::run_server().await?;
+        if Self::run_server().await.is_err() {
+            report.send(ServerStatus::Error)?;
+        } else {
+            report.send(ServerStatus::Offline)?;
+        }
 
         Ok(())
     }
@@ -144,7 +150,7 @@ impl Server {
         envs.insert("RUST_BACKTRACE", "1");
         envs.insert(
             "RUST_LOG",
-            "debug,uvth=error,rustls=error,tiny_http=warn,veloren_network=warn",
+            "debug,uvth=error,rustls=error,tiny_http=warn,veloren_network=warn,dot_vox=warn",
         );
         cmd.envs(envs);
 
@@ -161,16 +167,5 @@ impl Server {
         utils::execute("git", cmd).await?;
 
         Ok(())
-    }
-
-    /// Returns server database path
-    pub const fn database(&self) -> &'static str {
-        // TODO: Check that it exists!
-        "veloren/saves/db.sqlite"
-    }
-    /// Retrieves current server settings
-    pub async fn settings(&self) -> Result<String> {
-        // TODO: Check that it exists!
-        Ok(tokio::fs::read_to_string("veloren/server_settings.ron").await?)
     }
 }
