@@ -1,25 +1,26 @@
 [package]
 name = "veloren_server_bot"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Songtronix <contact@songtronix.com>"]
 edition = "2018"
 publish = false
 
 [dependencies]
 # Async
-tokio = { version = "0.2.22", features = ["macros", "process", "stream", "rt-threaded", "sync"] }
-futures = "0.3.5"
+tokio = { version = "1.2.0", features = ["macros", "process", "rt-multi-thread", "sync"] }
+tokio-stream = { version = "0.1.4", features = ["io-util"] }
+futures = "0.3.13"
 # Logging
 fern = { version = "0.6.0", features = ["colored"] }
-chrono = "0.4.15"
-log = "0.4"
+chrono = "0.4.19"
+log = "0.4.14"
 # Config
 config = { version = "0.10.1", features = ["toml"] }
-serde = { version = "1.0.116", features = ["derive"] }
-toml = "0.5.6"
+serde = { version = "1.0.124", features = ["derive"] }
+toml = "0.5.8"
 # Error handling
-anyhow = "1.0.32"
+anyhow = "1.0.38"
 # Discord
-serenity = { version = "0.9.0-rc.1", features = ["cache", "framework", "standard_framework", "rustls_backend"] }
+serenity = { version = "0.10.4", features = ["cache", "framework", "standard_framework", "rustls_backend"] }
 # Other
 lazy_static = "1.4.0"

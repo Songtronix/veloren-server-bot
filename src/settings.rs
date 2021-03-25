@@ -71,7 +71,7 @@ impl Settings {
 
     pub async fn set_branch<T: ToString>(&mut self, branch: T) -> Result<bool> {
         let mut cmd = Command::new("git");
-        cmd.current_dir(PathBuf::from("veloren").canonicalize()?);
+        cmd.current_dir(PathBuf::from("veloren"));
         cmd.args(&[
             "ls-remote",
             "--exit-code",

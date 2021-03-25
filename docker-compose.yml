@@ -18,6 +18,7 @@ services:
   frontail:
     image: mthenw/frontail
     container_name: frontail
+    depends_on: [veloren-server-bot]
     ports:
       - "9001:9001"
     restart: on-failure:0

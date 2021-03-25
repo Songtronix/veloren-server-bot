@@ -1,7 +1,7 @@
 use serenity::{
     framework::standard::macros::check, framework::standard::Args,
-    framework::standard::CheckResult, framework::standard::CommandOptions,
-    framework::standard::Reason, model::channel::Message, prelude::*,
+    framework::standard::CommandOptions, framework::standard::Reason, model::channel::Message,
+    prelude::*,
 };
 
 use crate::settings::Settings;
@@ -21,19 +21,21 @@ async fn admin_check(
     msg: &Message,
     _: &mut Args,
     _: &CommandOptions,
-) -> CheckResult {
+) -> Result<(), Reason> {
     let data = ctx.data.read().await;
     if let Some(settings) = data.get::<Settings>() {
         let settings = settings.lock().await;
 
         if settings.admins().contains(&msg.author.id) || settings.owner == msg.author.id.0 {
-            return true.into();
+            return Ok(());
         } else {
-            return CheckResult::Failure(Reason::User(
+            return Err(Reason::User(
                 "You need to be an Admin to execute this command.".to_string(),
             ));
         }
     }
 
-    false.into()
+    Err(Reason::User(
+        "Failed to aquire admin list. Please contact an admin to report this issue.".to_string(),
+    ))
 }

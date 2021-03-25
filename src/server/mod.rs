@@ -3,7 +3,8 @@ use crate::utils;
 
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
+use futures::FutureExt;
 use serenity::prelude::TypeMapKey;
 use task::Task;
 use tokio::sync::Mutex;
@@ -15,7 +16,10 @@ pub enum ServerStatus {
     Updating,
     Compiling,
     Online,
-    Error,
+
+    UpdateFailed,
+    CompileFailed,
+    RunFailed,
 }
 
 impl std::fmt::Display for ServerStatus {
@@ -25,7 +29,9 @@ impl std::fmt::Display for ServerStatus {
             ServerStatus::Updating => write!(f, "Updating..."),
             ServerStatus::Compiling => write!(f, "Compiling..."),
             ServerStatus::Online => write!(f, "Online"),
-            ServerStatus::Error => write!(f, "Failed"),
+            ServerStatus::UpdateFailed => write!(f, "Failed to update"),
+            ServerStatus::CompileFailed => write!(f, "Compile Failed"),
+            ServerStatus::RunFailed => write!(f, "Starting Failed"),
         }
     }
 }
@@ -45,8 +51,12 @@ impl Server {
     pub async fn new() -> Result<Self> {
         // First setup
         if !PathBuf::from("veloren/Cargo.toml").exists() {
-            Self::clone_repository().await?;
-            Self::run_compile().await?;
+            Self::clone_repository()
+                .await
+                .context("Failed to clone repository for the first time.")?;
+            Self::run_compile()
+                .await
+                .context("Failed to compile for the first time.")?;
         }
 
         Ok(Self {
@@ -88,7 +98,8 @@ impl Server {
 
     pub async fn status(&mut self) -> &ServerStatus {
         if let Some(reporter) = &mut self.reporter {
-            while let Ok(status) = reporter.try_recv() {
+            // TODO: https://github.com/tokio-rs/tokio/pull/3263
+            while let Some(status) = reporter.recv().now_or_never().flatten() {
                 self.status = status;
             }
         }
@@ -102,26 +113,31 @@ impl Server {
 
     async fn setup(report: mpsc::UnboundedSender<ServerStatus>, branch: String) -> Result<()> {
         report.send(ServerStatus::Updating)?;
-        Self::run_update(branch).await?;
+        if Self::run_update(branch).await.is_err() {
+            report.send(ServerStatus::UpdateFailed)?;
+            return Ok(());
+        }
         report.send(ServerStatus::Compiling)?;
-        Self::run_compile().await?;
+        if Self::run_compile().await.is_err() {
+            report.send(ServerStatus::CompileFailed)?;
+            return Ok(());
+        }
         report.send(ServerStatus::Online)?;
         if Self::run_server().await.is_err() {
-            report.send(ServerStatus::Error)?;
+            report.send(ServerStatus::RunFailed)?;
         } else {
             report.send(ServerStatus::Offline)?;
         }
-
         Ok(())
     }
 
     async fn run_update(branch: String) -> Result<()> {
         log::info!("Updating repository...");
         let mut cmd = Command::new("bash");
-        cmd.current_dir(PathBuf::from("veloren").canonicalize()?);
+        cmd.current_dir(PathBuf::from("veloren"));
         cmd.arg("-c");
         cmd.arg(format!(
-            "git fetch && git checkout {b} && git reset --hard origin/{b}",
+            "git fetch --all && git checkout {b} && git reset --hard origin/{b}",
             b = branch
         ));
 
@@ -134,7 +150,7 @@ impl Server {
         let mut cmd = Command::new("cargo");
         cmd.arg("build");
         cmd.args(&["--bin", "veloren-server-cli"]);
-        cmd.current_dir(PathBuf::from("veloren").canonicalize()?);
+        cmd.current_dir(PathBuf::from("veloren"));
 
         utils::execute("cargo", cmd).await?;
         Ok(())
@@ -144,7 +160,7 @@ impl Server {
         log::info!("Starting Veloren Server...");
         let mut cmd = Command::new("target/debug/veloren-server-cli");
         cmd.arg("-b");
-        cmd.current_dir(PathBuf::from("veloren").canonicalize()?);
+        cmd.current_dir(PathBuf::from("veloren"));
 
         let mut envs = HashMap::new();
         envs.insert("RUST_BACKTRACE", "1");

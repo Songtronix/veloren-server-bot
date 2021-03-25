@@ -81,9 +81,9 @@ pub async fn run(settings: Settings, server: Server) -> Result<()> {
         .on_dispatch_error(dispatch_error_hook)
         .help(&HELP);
 
-    let mut client = Client::new(&settings.token)
-        .framework(framework)
+    let mut client = Client::builder(&settings.token)
         .event_handler(Handler)
+        .framework(framework)
         .await?;
 
     {
@@ -118,7 +118,6 @@ async fn dispatch_error_hook(ctx: &Context, msg: &Message, error: DispatchError)
             let s = format!("Max arguments allowed is {}, but got {}.", max, given);
             let _ = msg.channel_id.say(&ctx, &s).await;
         }
-        DispatchError::IgnoredBot => {}
         DispatchError::CheckFailed(_failed_check, Reason::User(reason)) => {
             let _ = msg.channel_id.say(&ctx.http, reason).await;
         }

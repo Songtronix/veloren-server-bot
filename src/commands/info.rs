@@ -24,10 +24,15 @@ async fn about(ctx: &Context, msg: &Message) -> CommandResult {
                 );
                 e.field(
                     "Purpose of this bot",
-                    "Provide easy access to the Veloren testing server",
+                    "Provide easy access to the Veloren testing server.",
                     true,
                 );
-                e.footer(|f| f.text("Copyright 2020 Veloren Team"));
+                e.footer(|f| {
+                    f.text(format!(
+                        "Copyright © {} Veloren Team",
+                        chrono::Utc::now().date().format("%Y")
+                    ))
+                });
                 e
             });
             m
@@ -75,7 +80,12 @@ async fn status(ctx: &Context, msg: &Message) -> CommandResult {
                         .build(),
                     false,
                 );
-                e.footer(|f| f.text("Copyright 2020 Veloren Team"));
+                e.footer(|f| {
+                    f.text(format!(
+                        "Copyright © {} Veloren Team",
+                        chrono::Utc::now().date().format("%Y")
+                    ))
+                });
                 e
             });
             m

@@ -12,7 +12,9 @@ pub fn init() -> Result<()> {
         .debug(Color::Green)
         .trace(Color::BrightBlack);
 
-    let base = fern::Dispatch::new();
+    let base = fern::Dispatch::new()
+        .level_for("tracing::span", log::LevelFilter::Warn)
+        .level_for("serenity", log::LevelFilter::Warn);
 
     let file_cfg = fern::Dispatch::new()
         .level(log::LevelFilter::Info)
