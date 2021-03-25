@@ -59,9 +59,6 @@ impl Server {
             Self::clone_repository()
                 .await
                 .context("Failed to clone repository for the first time.")?;
-            Self::run_compile()
-                .await
-                .context("Failed to compile for the first time.")?;
         }
 
         Ok(Self {
@@ -124,36 +121,25 @@ impl Server {
         !matches!(self.status().await, ServerStatus::Offline)
     }
 
-    async fn setup(report: mpsc::UnboundedSender<ServerStatus>, branch: String) {
+    async fn setup(reporter: mpsc::UnboundedSender<ServerStatus>, branch: String) {
+        let mut reporter = Some(reporter);
         // Update Repository.
-        let _ = report.send(ServerStatus::Updating);
-        if Self::run_update(branch).await.is_err() {
-            let _ = report.send(ServerStatus::UpdateFailed);
-            return;
-        }
+        Self::run_update(&mut reporter, &branch).await;
         // Query new version
-        if let Ok(version) = Self::run_version().await {
-            let _ = report.send(ServerStatus::Version(version));
-        } else {
-            let _ = report.send(ServerStatus::UpdateFailed);
-            return;
-        }
-        let _ = report.send(ServerStatus::Compiling);
+        Self::run_version(&mut reporter).await;
         // Compile server
-        if Self::run_compile().await.is_err() {
-            let _ = report.send(ServerStatus::CompileFailed);
-            return;
-        }
-        let _ = report.send(ServerStatus::Online);
+        Self::run_compile(&mut reporter).await;
         // Start Server
-        if Self::run_server().await.is_err() {
-            let _ = report.send(ServerStatus::RunFailed);
-        } else {
-            let _ = report.send(ServerStatus::Offline);
-        }
+        Self::run_server(&mut reporter).await;
     }
 
-    async fn run_update(branch: String) -> Result<()> {
+    async fn run_update(report: &mut Option<mpsc::UnboundedSender<ServerStatus>>, branch: &str) {
+        let reporter = match report {
+            Some(report) => report,
+            None => return,
+        };
+        let _ = reporter.send(ServerStatus::Updating);
+
         log::info!("Updating repository...");
         let mut cmd = Command::new("bash");
         cmd.current_dir(PathBuf::from("veloren"));
@@ -163,11 +149,18 @@ impl Server {
             b = branch
         ));
 
-        utils::execute("git", cmd).await?;
-        Ok(())
+        if utils::execute("git", cmd).await.is_err() {
+            let _ = reporter.send(ServerStatus::UpdateFailed);
+            report.take();
+        }
     }
 
-    async fn run_version() -> Result<String> {
+    async fn run_version(report: &mut Option<mpsc::UnboundedSender<ServerStatus>>) {
+        let reporter = match report {
+            Some(report) => report,
+            None => return,
+        };
+
         log::info!("Querying Git commit...");
         let mut cmd = Command::new("git");
         cmd.current_dir(PathBuf::from("veloren"));
@@ -175,21 +168,43 @@ impl Server {
         cmd.arg("--short");
         cmd.arg("HEAD");
 
-        Ok(utils::aquire_output(&mut cmd).await?)
+        match utils::aquire_output(&mut cmd).await {
+            Ok(version) => {
+                let _ = reporter.send(ServerStatus::Version(version));
+            }
+            Err(_) => {
+                let _ = reporter.send(ServerStatus::UpdateFailed);
+                report.take();
+            }
+        }
     }
 
-    async fn run_compile() -> Result<()> {
+    async fn run_compile(report: &mut Option<mpsc::UnboundedSender<ServerStatus>>) {
+        let reporter = match report {
+            Some(report) => report,
+            None => return,
+        };
+        let _ = reporter.send(ServerStatus::Compiling);
+
         log::info!("Compiling...");
         let mut cmd = Command::new("cargo");
         cmd.arg("build");
         cmd.args(&["--bin", "veloren-server-cli"]);
         cmd.current_dir(PathBuf::from("veloren"));
 
-        utils::execute("cargo", cmd).await?;
-        Ok(())
+        if utils::execute("cargo", cmd).await.is_err() {
+            let _ = reporter.send(ServerStatus::CompileFailed);
+            report.take();
+        }
     }
 
-    async fn run_server() -> Result<()> {
+    async fn run_server(report: &mut Option<mpsc::UnboundedSender<ServerStatus>>) {
+        let reporter = match report {
+            Some(report) => report,
+            None => return,
+        };
+        let _ = reporter.send(ServerStatus::Online);
+
         log::info!("Starting Veloren Server...");
         let mut cmd = Command::new("target/debug/veloren-server-cli");
         cmd.arg("-b");
@@ -203,8 +218,10 @@ impl Server {
         );
         cmd.envs(envs);
 
-        utils::execute("veloren", cmd).await?;
-        Ok(())
+        if utils::execute("veloren", cmd).await.is_err() {
+            let _ = reporter.send(ServerStatus::RunFailed);
+            report.take();
+        }
     }
 
     async fn clone_repository() -> Result<()> {

@@ -105,7 +105,7 @@ async fn logs(ctx: &Context, msg: &Message) -> CommandResult {
                     .push_bold("Password: ")
                     .push_line(&settings.web_password)
                     .push_bold("Url: ")
-                    .push_line(&settings.address)
+                    .push_line(&settings.web_address)
                     .build(),
             )
         })

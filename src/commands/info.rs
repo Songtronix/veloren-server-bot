@@ -91,7 +91,7 @@ async fn status(ctx: &Context, msg: &Message) -> CommandResult {
                 e.field(
                     "Address",
                     MessageBuilder::new()
-                        .push_codeblock_safe(&settings.address, None)
+                        .push_codeblock_safe(&settings.gameserver_address, None)
                         .build(),
                     false,
                 );

@@ -83,7 +83,7 @@ pub async fn run(settings: Settings, server: Server) -> Result<()> {
         .help(&HELP);
 
     let mut client = Client::builder(&settings.token)
-        .event_handler(Handler(settings.address.clone()))
+        .event_handler(Handler(settings.gameserver_address.clone()))
         .framework(framework)
         .await?;
 

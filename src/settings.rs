@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use serenity::{model::id::UserId, prelude::TypeMapKey};
 use tokio::{process::Command, sync::Mutex};
 
+// TODO: Separate Configuration/Settings and state (branch, admins, commit)
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -15,12 +17,14 @@ pub struct Settings {
     pub owner: u64,
     /// Command prefix
     pub prefix: String,
+    /// The Website to access the logs.
+    pub web_address: String,
     /// The Password to access the logs.
     pub web_password: String,
     /// Branch to compile
     branch: String,
-    /// Server's address to be advertised in status cmd.
-    pub address: String,
+    /// Gameservers's address
+    pub gameserver_address: String,
     /// Admins which are allowed to modify the server.
     admins: HashSet<u64>,
 }
@@ -31,9 +35,10 @@ impl Default for Settings {
             token: String::from("DISCORD_BOT_TOKEN_HERE"),
             owner: 999999999,
             prefix: String::from("~"),
+            web_address: String::from("WEB_LOGS_WEBSITE_HERE"),
             web_password: String::from("WEB_LOGS_PASSWORD_HERE"),
             branch: String::from("master"),
-            address: String::from("SERVER_ADDRESS_HERE"),
+            gameserver_address: String::from("GAMESERVER_ADDRESS_HERE"),
             admins: HashSet::new(),
         }
     }
