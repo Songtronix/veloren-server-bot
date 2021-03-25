@@ -71,10 +71,25 @@ async fn status(ctx: &Context, msg: &Message) -> CommandResult {
         .send_message(&ctx.http, |m| {
             m.embed(|e| {
                 e.title("Veloren Server Status");
-                e.field("Status", status, true);
-                e.field("Branch", settings.branch(), true);
                 e.field(
-                    "address",
+                    "Status",
+                    MessageBuilder::new().push_mono(status).build(),
+                    true,
+                );
+                if let Some(version) = server.version() {
+                    e.field(
+                        "Commit",
+                        MessageBuilder::new().push_mono(version).build(),
+                        true,
+                    );
+                }
+                e.field(
+                    "Branch",
+                    MessageBuilder::new().push_mono(settings.branch()).build(),
+                    false,
+                );
+                e.field(
+                    "Address",
                     MessageBuilder::new()
                         .push_codeblock_safe(&settings.address, None)
                         .build(),

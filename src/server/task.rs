@@ -15,14 +15,14 @@ impl Task {
     /// Creates a new task and immediatly runs it in a `tokio::task`.
     pub fn new<F>(task: F) -> Self
     where
-        F: Future<Output = Result<()>> + Send + 'static,
+        F: Future<Output = ()> + Send + 'static,
     {
         let (shutdown, abort_registration) = AbortHandle::new_pair();
         let done = Arc::new(AtomicBool::new(false));
         let done2 = done.clone();
         let future = Abortable::new(task, abort_registration);
         let handle = tokio::task::spawn(async move {
-            future.await??;
+            future.await?;
             done2.store(true, Ordering::Relaxed);
             Ok(())
         });

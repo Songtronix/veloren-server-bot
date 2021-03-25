@@ -6,6 +6,19 @@ use tokio::{
 };
 use tokio_stream::wrappers::LinesStream;
 
+/// Aquires output from Command and returns it.
+pub async fn aquire_output(cmd: &mut Command) -> Result<String> {
+    Ok(String::from_utf8_lossy(
+        &cmd.output()
+            .await
+            .context("Failed to convert process output to UTF-8")?
+            .stdout,
+    )
+    .trim()
+    .to_string())
+}
+
+/// Execute Command and log stdout/stderr.
 pub async fn execute(name: &str, mut cmd: Command) -> Result<()> {
     log::debug!("Executing: {:?}", cmd);
 

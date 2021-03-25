@@ -10,10 +10,11 @@ use task::Task;
 use tokio::sync::Mutex;
 use tokio::{process::Command, sync::mpsc};
 
-#[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum ServerStatus {
     Offline,
     Updating,
+    Version(String),
     Compiling,
     Online,
 
@@ -32,6 +33,9 @@ impl std::fmt::Display for ServerStatus {
             ServerStatus::UpdateFailed => write!(f, "Failed to update"),
             ServerStatus::CompileFailed => write!(f, "Compile Failed"),
             ServerStatus::RunFailed => write!(f, "Starting Failed"),
+            ServerStatus::Version(_) => {
+                unreachable!("ServerStatus::Version should be catched by Server!")
+            }
         }
     }
 }
@@ -41,6 +45,7 @@ pub struct Server {
     reporter: Option<mpsc::UnboundedReceiver<ServerStatus>>,
     task: Option<Task>,
     status: ServerStatus,
+    version: Option<String>,
 }
 
 impl TypeMapKey for Server {
@@ -63,6 +68,7 @@ impl Server {
             reporter: None,
             task: None,
             status: ServerStatus::Offline,
+            version: None,
         })
     }
 
@@ -96,39 +102,55 @@ impl Server {
         }
     }
 
-    pub async fn status(&mut self) -> &ServerStatus {
+    pub async fn status(&mut self) -> ServerStatus {
         if let Some(reporter) = &mut self.reporter {
             // TODO: https://github.com/tokio-rs/tokio/pull/3263
             while let Some(status) = reporter.recv().now_or_never().flatten() {
-                self.status = status;
+                match status {
+                    ServerStatus::Version(version) => self.version = Some(version),
+                    status => self.status = status,
+                }
             }
         }
 
-        &self.status
+        self.status.clone()
+    }
+
+    pub fn version(&self) -> Option<String> {
+        self.version.clone()
     }
 
     pub async fn running(&mut self) -> bool {
         !matches!(self.status().await, ServerStatus::Offline)
     }
 
-    async fn setup(report: mpsc::UnboundedSender<ServerStatus>, branch: String) -> Result<()> {
-        report.send(ServerStatus::Updating)?;
+    async fn setup(report: mpsc::UnboundedSender<ServerStatus>, branch: String) {
+        // Update Repository.
+        let _ = report.send(ServerStatus::Updating);
         if Self::run_update(branch).await.is_err() {
-            report.send(ServerStatus::UpdateFailed)?;
-            return Ok(());
+            let _ = report.send(ServerStatus::UpdateFailed);
+            return;
         }
-        report.send(ServerStatus::Compiling)?;
-        if Self::run_compile().await.is_err() {
-            report.send(ServerStatus::CompileFailed)?;
-            return Ok(());
-        }
-        report.send(ServerStatus::Online)?;
-        if Self::run_server().await.is_err() {
-            report.send(ServerStatus::RunFailed)?;
+        // Query new version
+        if let Ok(version) = Self::run_version().await {
+            let _ = report.send(ServerStatus::Version(version));
         } else {
-            report.send(ServerStatus::Offline)?;
+            let _ = report.send(ServerStatus::UpdateFailed);
+            return;
         }
-        Ok(())
+        let _ = report.send(ServerStatus::Compiling);
+        // Compile server
+        if Self::run_compile().await.is_err() {
+            let _ = report.send(ServerStatus::CompileFailed);
+            return;
+        }
+        let _ = report.send(ServerStatus::Online);
+        // Start Server
+        if Self::run_server().await.is_err() {
+            let _ = report.send(ServerStatus::RunFailed);
+        } else {
+            let _ = report.send(ServerStatus::Offline);
+        }
     }
 
     async fn run_update(branch: String) -> Result<()> {
@@ -143,6 +165,17 @@ impl Server {
 
         utils::execute("git", cmd).await?;
         Ok(())
+    }
+
+    async fn run_version() -> Result<String> {
+        log::info!("Querying Git commit...");
+        let mut cmd = Command::new("git");
+        cmd.current_dir(PathBuf::from("veloren"));
+        cmd.arg("rev-parse");
+        cmd.arg("--short");
+        cmd.arg("HEAD");
+
+        Ok(utils::aquire_output(&mut cmd).await?)
     }
 
     async fn run_compile() -> Result<()> {

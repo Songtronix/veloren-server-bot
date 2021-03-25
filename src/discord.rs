@@ -9,7 +9,7 @@ use serenity::{
     model::channel::Message,
     model::id::UserId,
     model::prelude::OnlineStatus,
-    model::{event::ResumedEvent, gateway::Ready},
+    model::{event::ResumedEvent, gateway::Ready, prelude::Activity},
     prelude::*,
 };
 use std::{collections::HashSet, sync::Arc};
@@ -22,13 +22,14 @@ impl TypeMapKey for ShardManagerContainer {
     type Value = Arc<Mutex<ShardManager>>;
 }
 
-struct Handler;
+struct Handler(String);
 
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         log::info!("Connected as {}", ready.user.name);
         ctx.set_presence(None, OnlineStatus::Online).await;
+        ctx.set_activity(Activity::playing(&self.0)).await;
     }
 
     async fn resume(&self, _ctx: Context, _: ResumedEvent) {
@@ -82,7 +83,7 @@ pub async fn run(settings: Settings, server: Server) -> Result<()> {
         .help(&HELP);
 
     let mut client = Client::builder(&settings.token)
-        .event_handler(Handler)
+        .event_handler(Handler(settings.address.clone()))
         .framework(framework)
         .await?;
 

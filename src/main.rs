@@ -15,6 +15,7 @@ use anyhow::{Context, Result};
 use server::Server;
 use settings::Settings;
 use tokio::process::Command;
+use utils::aquire_output;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -57,15 +58,4 @@ async fn main() -> Result<()> {
     discord::run(settings, server)
         .await
         .context("Failed to start discord.")
-}
-
-async fn aquire_output(cmd: &mut Command) -> Result<String> {
-    Ok(String::from_utf8_lossy(
-        &cmd.output()
-            .await
-            .context("Failed to convert process output to UTF-8")?
-            .stdout,
-    )
-    .trim()
-    .to_string())
 }
