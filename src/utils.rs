@@ -66,9 +66,12 @@ async fn print_progress(name: String, stdout: ChildStdout, stderr: ChildStderr) 
     while let Some(progress) = output_stream.next().await {
         match progress {
             ProcessUpdate::Line(line) => {
-                log::info!("[{}] {}", name, line.trim()); // TODO: Make more robust (e.g. remove/split newlines etc)
+                log::info!("[{}] {}", name, line.trim_start().trim_end());
             }
-            ProcessUpdate::Error(e) => return Err(e.into()),
+            ProcessUpdate::Error(e) => {
+                log::error!("Failed to pipe process output: {}", e);
+                return Err(e.into());
+            }
         }
     }
     Ok(())

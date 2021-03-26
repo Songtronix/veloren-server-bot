@@ -141,15 +141,29 @@ impl Server {
         let _ = reporter.send(ServerStatus::Updating);
 
         log::info!("Updating repository...");
-        let mut cmd = Command::new("bash");
-        cmd.current_dir(PathBuf::from("veloren"));
-        cmd.arg("-c");
-        cmd.arg(format!(
-            "git fetch --all && git checkout {b} && git reset --hard origin/{b}",
-            b = branch
-        ));
 
-        if utils::execute("git", cmd).await.is_err() {
+        let mut fetch = Command::new("git");
+        fetch.current_dir(PathBuf::from("veloren"));
+        fetch.args(&["fetch", "--all"]);
+
+        let mut checkout = Command::new("git");
+        checkout.current_dir(PathBuf::from("veloren"));
+        checkout.args(&["checkout", branch]);
+
+        let mut reset = Command::new("git");
+        reset.current_dir(PathBuf::from("veloren"));
+        reset.args(&["reset", "--hard", &format!("origin/{}", branch)]);
+
+        if let Err(e) = utils::execute("git", fetch).await {
+            log::error!("Failed to fetch updates: {}", e);
+            let _ = reporter.send(ServerStatus::UpdateFailed);
+            report.take();
+        } else if let Err(e) = utils::execute("git", checkout).await {
+            log::error!("Failed to fetch updates: {}", e);
+            let _ = reporter.send(ServerStatus::UpdateFailed);
+            report.take();
+        } else if let Err(e) = utils::execute("git", reset).await {
+            log::error!("Failed to fetch updates: {}", e);
             let _ = reporter.send(ServerStatus::UpdateFailed);
             report.take();
         }
@@ -172,7 +186,8 @@ impl Server {
             Ok(version) => {
                 let _ = reporter.send(ServerStatus::Version(version));
             }
-            Err(_) => {
+            Err(e) => {
+                log::error!("Failed to get commit hash: {}", e);
                 let _ = reporter.send(ServerStatus::UpdateFailed);
                 report.take();
             }
@@ -192,7 +207,8 @@ impl Server {
         cmd.args(&["--bin", "veloren-server-cli"]);
         cmd.current_dir(PathBuf::from("veloren"));
 
-        if utils::execute("cargo", cmd).await.is_err() {
+        if let Err(e) = utils::execute("cargo", cmd).await {
+            log::error!("Failed to compile: {}", e);
             let _ = reporter.send(ServerStatus::CompileFailed);
             report.take();
         }
@@ -206,7 +222,10 @@ impl Server {
         let _ = reporter.send(ServerStatus::Online);
 
         log::info!("Starting Veloren Server...");
-        let mut cmd = Command::new("target/debug/veloren-server-cli");
+        let mut cmd = Command::new("cargo");
+        cmd.arg("run");
+        cmd.args(&["--bin", "veloren-server-cli"]);
+        cmd.arg("--");
         cmd.arg("-b");
         cmd.current_dir(PathBuf::from("veloren"));
 
@@ -218,7 +237,8 @@ impl Server {
         );
         cmd.envs(envs);
 
-        if utils::execute("veloren", cmd).await.is_err() {
+        if let Err(e) = utils::execute("veloren", cmd).await {
+            log::error!("Failed to start server: {}", e);
             let _ = reporter.send(ServerStatus::RunFailed);
             report.take();
         }
@@ -228,7 +248,7 @@ impl Server {
         log::info!("Cloning repository...");
         let mut cmd = Command::new("git");
         cmd.arg("clone");
-        cmd.arg("https://gitlab.com/veloren/veloren.git"); // TODO: Once `print_progress` addressed add `--progress`
+        cmd.arg("https://gitlab.com/veloren/veloren.git");
 
         utils::execute("git", cmd).await?;
 
