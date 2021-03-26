@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::{ffi::OsString, path::PathBuf, str::FromStr};
 use tokio::io::AsyncWriteExt;
 
-use crate::{server::Server, settings::Settings};
+use crate::{server::Server, state::State};
 
 lazy_static::lazy_static! {
     /// All files allowed to be viewed, updated, deleted.
@@ -102,24 +102,8 @@ async fn files(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     };
 
     let data = ctx.data.read().await;
-    let mut server = match data.get::<Server>() {
-        Some(server) => server.lock().await,
-        None => {
-            msg.channel_id
-                .say(&ctx.http, "Couldn't aquire server information.")
-                .await?;
-            return Ok(());
-        }
-    };
-    let settings = match data.get::<Settings>() {
-        Some(settings) => settings.lock().await,
-        None => {
-            msg.channel_id
-                .say(&ctx, "There was a problem getting the settings :/")
-                .await?;
-            return Ok(());
-        }
-    };
+    let mut server = data_get!(data, msg, ctx, Server);
+    let state = data_get!(data, msg, ctx, State);
 
     match operation {
         Operation::Upload => {
@@ -144,7 +128,7 @@ async fn files(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
                     file.write_all(&content).await?;
                     file.sync_all().await?;
 
-                    server.start(settings.branch()).await;
+                    server.start(state.head()).await;
 
                     msg.channel_id.say(&ctx, "File uploaded and server restarted.").await?;
                 }
@@ -161,7 +145,7 @@ async fn files(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
         Operation::Remove => {
             server.stop().await;
             tokio::fs::remove_file(file.0).await?;
-            server.start(settings.branch()).await;
+            server.start(state.head()).await;
 
             msg.channel_id
                 .say(&ctx, "File removed and server restarted.")

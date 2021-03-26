@@ -1,4 +1,5 @@
-use crate::{discord::ShardManagerContainer, settings::Settings};
+use super::utils;
+use crate::{discord::ShardManagerContainer, state::State};
 use anyhow::Result;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
@@ -7,8 +8,6 @@ use serenity::{
     utils::MessageBuilder,
 };
 use std::str::FromStr;
-
-use super::utils;
 
 #[command]
 #[description = "Shutdown the bot."]
@@ -67,25 +66,17 @@ async fn admin(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let operation = args.single::<Operation>()?;
 
     let data = ctx.data.read().await;
-    let mut settings = match data.get::<Settings>() {
-        Some(settings) => settings.lock().await,
-        None => {
-            msg.channel_id
-                .say(&ctx, "There was a problem getting the settings :/")
-                .await?;
-            return Ok(());
-        }
-    };
+    let mut state = data_get!(data, msg, ctx, State);
 
     match operation {
         Operation::List => {
             let mut response = MessageBuilder::new();
             response.push_bold_line("Admins:");
-            for admin in settings.admins() {
+            for admin in state.admins() {
                 let admin = admin.to_user(&ctx.http).await?;
                 response.push_line_safe(format!("{} ({})", admin.tag(), admin.id));
             }
-            if settings.admins().is_empty() {
+            if state.admins().is_empty() {
                 response.push_italic_line("No Admins found.");
             }
             msg.channel_id.say(&ctx.http, response.build()).await?;
@@ -102,7 +93,7 @@ async fn admin(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
                 }
             };
 
-            settings.add_admin(whom.id.0).await?;
+            state.add_admin(whom.id.0).await?;
             msg.channel_id
                 .say(
                     &ctx.http,
@@ -122,7 +113,7 @@ async fn admin(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
                 }
             };
 
-            settings.remove_admin(whom.id.0).await?;
+            state.remove_admin(whom.id.0).await?;
             msg.channel_id
                 .say(
                     &ctx.http,

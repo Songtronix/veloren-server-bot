@@ -1,12 +1,9 @@
-use std::{collections::HashSet, path::PathBuf, process::Stdio, sync::Arc};
-
 use anyhow::Result;
 use config::{Config, ConfigError, Environment, File};
 use serde::{Deserialize, Serialize};
-use serenity::{model::id::UserId, prelude::TypeMapKey};
-use tokio::{process::Command, sync::Mutex};
-
-// TODO: Separate Configuration/Settings and state (branch, admins, commit)
+use serenity::prelude::TypeMapKey;
+use std::{path::PathBuf, sync::Arc};
+use tokio::sync::Mutex;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
@@ -21,12 +18,8 @@ pub struct Settings {
     pub web_address: String,
     /// The Password to access the logs.
     pub web_password: String,
-    /// Branch to compile
-    branch: String,
     /// Gameservers's address
     pub gameserver_address: String,
-    /// Admins which are allowed to modify the server.
-    admins: HashSet<u64>,
 }
 
 impl Default for Settings {
@@ -37,9 +30,7 @@ impl Default for Settings {
             prefix: String::from("~"),
             web_address: String::from("WEB_LOGS_WEBSITE_HERE"),
             web_password: String::from("WEB_LOGS_PASSWORD_HERE"),
-            branch: String::from("master"),
             gameserver_address: String::from("GAMESERVER_ADDRESS_HERE"),
-            admins: HashSet::new(),
         }
     }
 }
@@ -64,56 +55,6 @@ impl Settings {
 
         // Deserialize entire configuration
         s.try_into()
-    }
-
-    pub fn admins(&self) -> HashSet<UserId> {
-        self.admins.iter().map(|s| UserId(*s)).collect()
-    }
-
-    pub fn branch(&self) -> &str {
-        &self.branch
-    }
-
-    pub async fn set_branch<T: ToString>(&mut self, branch: T) -> Result<bool> {
-        let mut cmd = Command::new("git");
-        cmd.current_dir(PathBuf::from("veloren"));
-        cmd.args(&[
-            "ls-remote",
-            "--exit-code",
-            "--heads",
-            "https://gitlab.com/veloren/veloren.git",
-            &branch.to_string(),
-        ]);
-
-        let exists = cmd
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .await?
-            .success();
-
-        if exists {
-            self.branch = branch.to_string();
-            self.save().await?;
-        }
-
-        Ok(exists)
-    }
-
-    /// adds an admin and saves it to the settings
-    pub async fn add_admin(&mut self, id: u64) -> Result<()> {
-        self.admins.insert(id);
-
-        self.save().await?;
-        Ok(())
-    }
-
-    /// removes an admin and saves it to the settings
-    pub async fn remove_admin(&mut self, id: u64) -> Result<()> {
-        self.admins.remove(&id);
-
-        self.save().await?;
-        Ok(())
     }
 
     pub async fn save(&self) -> Result<()> {

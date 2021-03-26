@@ -4,7 +4,7 @@ use serenity::{
     prelude::*,
 };
 
-use crate::settings::Settings;
+use crate::{settings::Settings, state::State};
 
 // A function which acts as a "check", to determine whether to call a command.
 //
@@ -23,10 +23,12 @@ async fn admin_check(
     _: &CommandOptions,
 ) -> Result<(), Reason> {
     let data = ctx.data.read().await;
-    if let Some(settings) = data.get::<Settings>() {
+    if let Some((settings, Some(state))) = data.get::<Settings>().map(|x| (x, data.get::<State>()))
+    {
+        let state = state.lock().await;
         let settings = settings.lock().await;
 
-        if settings.admins().contains(&msg.author.id) || settings.owner == msg.author.id.0 {
+        if state.admins().contains(&msg.author.id) || settings.owner == msg.author.id.0 {
             return Ok(());
         } else {
             return Err(Reason::User(

@@ -14,7 +14,7 @@ use serenity::{
 };
 use std::{collections::HashSet, sync::Arc};
 
-use crate::{checks::*, commands::*, server::Server, settings::Settings, Result};
+use crate::{checks::*, commands::*, server::Server, settings::Settings, state::State, Result};
 
 pub struct ShardManagerContainer;
 
@@ -87,10 +87,13 @@ pub async fn run(settings: Settings, server: Server) -> Result<()> {
         .framework(framework)
         .await?;
 
+    let state = State::new().unwrap_or_default();
+
     {
         let mut data = client.data.write().await;
         data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
         data.insert::<Settings>(Arc::new(Mutex::new(settings)));
+        data.insert::<State>(Arc::new(Mutex::new(state)));
         data.insert::<Server>(Arc::new(Mutex::new(server)));
     }
 

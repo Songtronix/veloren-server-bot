@@ -10,6 +10,14 @@ use task::Task;
 use tokio::sync::Mutex;
 use tokio::{process::Command, sync::mpsc};
 
+#[derive(Debug)]
+pub struct Server {
+    reporter: Option<mpsc::UnboundedReceiver<ServerStatus>>,
+    task: Option<Task>,
+    status: ServerStatus,
+    version: Option<String>,
+}
+
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum ServerStatus {
     Offline,
@@ -38,14 +46,6 @@ impl std::fmt::Display for ServerStatus {
             }
         }
     }
-}
-
-#[derive(Debug)]
-pub struct Server {
-    reporter: Option<mpsc::UnboundedReceiver<ServerStatus>>,
-    task: Option<Task>,
-    status: ServerStatus,
-    version: Option<String>,
 }
 
 impl TypeMapKey for Server {

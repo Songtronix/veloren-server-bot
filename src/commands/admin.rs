@@ -1,4 +1,4 @@
-use crate::{server::Server, settings::Settings};
+use crate::{server::Server, settings::Settings, state::State};
 use serenity::prelude::*;
 use serenity::{framework::standard::Args, model::prelude::*};
 use serenity::{
@@ -33,31 +33,15 @@ async fn branch(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let branch = args.single::<String>()?;
 
     let data = ctx.data.read().await;
-    let mut server = match data.get::<Server>() {
-        Some(server) => server.lock().await,
-        None => {
-            msg.channel_id
-                .say(&ctx.http, "Couldn't aquire server information.")
-                .await?;
-            return Ok(());
-        }
-    };
-    let mut settings = match data.get::<Settings>() {
-        Some(settings) => settings.lock().await,
-        None => {
-            msg.channel_id
-                .say(&ctx, "There was a problem getting the settings :/")
-                .await?;
-            return Ok(());
-        }
-    };
+    let mut server = data_get!(data, msg, ctx, Server);
+    let mut state = data_get!(data, msg, ctx, State);
 
     let mut edit_msg = msg
         .channel_id
         .say(&ctx.http, "Checking if branch exists...")
         .await?;
 
-    match settings.set_branch(&branch).await? {
+    match state.set_head(&branch).await? {
         true => {
             edit_msg
                 .edit(&ctx.http, |m| {
@@ -67,7 +51,7 @@ async fn branch(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
                     ))
                 })
                 .await?;
-            server.restart(settings.branch()).await;
+            server.restart(state.head()).await;
         }
         false => {
             edit_msg
@@ -85,15 +69,7 @@ async fn branch(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
 #[description = "Sends you the details to aquire the logs."]
 async fn logs(ctx: &Context, msg: &Message) -> CommandResult {
     let data = ctx.data.read().await;
-    let settings = match data.get::<Settings>() {
-        Some(settings) => settings.lock().await,
-        None => {
-            msg.channel_id
-                .say(&ctx, "There was a problem getting the settings :/")
-                .await?;
-            return Ok(());
-        }
-    };
+    let settings = data_get!(data, msg, ctx, Settings);
 
     msg.author
         .dm(&ctx, |m| {
@@ -119,26 +95,10 @@ async fn logs(ctx: &Context, msg: &Message) -> CommandResult {
 async fn start(ctx: &Context, msg: &Message) -> CommandResult {
     let data = ctx.data.read().await;
 
-    let mut server = match data.get::<Server>() {
-        Some(server) => server.lock().await,
-        None => {
-            msg.channel_id
-                .say(&ctx.http, "Couldn't aquire server information.")
-                .await?;
-            return Ok(());
-        }
-    };
-    let settings = match data.get::<Settings>() {
-        Some(settings) => settings.lock().await,
-        None => {
-            msg.channel_id
-                .say(&ctx, "There was a problem getting the settings :/")
-                .await?;
-            return Ok(());
-        }
-    };
+    let mut server = data_get!(data, msg, ctx, Server);
+    let state = data_get!(data, msg, ctx, State);
 
-    server.start(settings.branch()).await;
+    server.start(state.head()).await;
 
     msg.channel_id
         .say(
@@ -155,15 +115,7 @@ async fn start(ctx: &Context, msg: &Message) -> CommandResult {
 async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
     let data = ctx.data.read().await;
 
-    let mut server = match data.get::<Server>() {
-        Some(server) => server.lock().await,
-        None => {
-            msg.channel_id
-                .say(&ctx.http, "Couldn't aquire server information.")
-                .await?;
-            return Ok(());
-        }
-    };
+    let mut server = data_get!(data, msg, ctx, Server);
 
     server.stop().await;
 
@@ -179,26 +131,10 @@ async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
 async fn restart(ctx: &Context, msg: &Message) -> CommandResult {
     let data = ctx.data.read().await;
 
-    let mut server = match data.get::<Server>() {
-        Some(server) => server.lock().await,
-        None => {
-            msg.channel_id
-                .say(&ctx.http, "Couldn't aquire server information.")
-                .await?;
-            return Ok(());
-        }
-    };
-    let settings = match data.get::<Settings>() {
-        Some(settings) => settings.lock().await,
-        None => {
-            msg.channel_id
-                .say(&ctx, "There was a problem getting the settings :/")
-                .await?;
-            return Ok(());
-        }
-    };
+    let mut server = data_get!(data, msg, ctx, Server);
+    let state = data_get!(data, msg, ctx, State);
 
-    server.restart(settings.branch()).await;
+    server.restart(state.head()).await;
 
     msg.channel_id
         .say(

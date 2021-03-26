@@ -5,7 +5,7 @@ use serenity::{
     utils::MessageBuilder,
 };
 
-use crate::{server::Server, settings::Settings};
+use crate::{server::Server, settings::Settings, state::State};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -46,24 +46,9 @@ async fn about(ctx: &Context, msg: &Message) -> CommandResult {
 async fn status(ctx: &Context, msg: &Message) -> CommandResult {
     let data = ctx.data.read().await;
 
-    let mut server = match data.get::<Server>() {
-        Some(server) => server.lock().await,
-        None => {
-            msg.channel_id
-                .say(&ctx.http, "Couldn't aquire server information.")
-                .await?;
-            return Ok(());
-        }
-    };
-    let settings = match data.get::<Settings>() {
-        Some(settings) => settings.lock().await,
-        None => {
-            msg.channel_id
-                .say(&ctx, "There was a problem getting the settings :/")
-                .await?;
-            return Ok(());
-        }
-    };
+    let mut server = data_get!(data, msg, ctx, Server);
+    let settings = data_get!(data, msg, ctx, Settings);
+    let state = data_get!(data, msg, ctx, State);
 
     let status = server.status().await;
 
@@ -85,7 +70,7 @@ async fn status(ctx: &Context, msg: &Message) -> CommandResult {
                 }
                 e.field(
                     "Branch",
-                    MessageBuilder::new().push_mono(settings.branch()).build(),
+                    MessageBuilder::new().push_mono(state.head()).build(),
                     false,
                 );
                 e.field(

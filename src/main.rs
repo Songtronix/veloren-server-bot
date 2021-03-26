@@ -7,8 +7,10 @@ mod discord;
 mod logger;
 /// Veloren Server handling
 mod server;
-/// Bot settings
+/// Bot Settings
 mod settings;
+/// Bot state
+mod state;
 mod utils;
 
 use anyhow::{Context, Result};

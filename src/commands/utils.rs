@@ -29,3 +29,20 @@ pub async fn get_member(ctx: &Context, msg: &Message, identifier: &str) -> Resul
 
     Ok(None)
 }
+
+#[macro_use]
+mod macros {
+    macro_rules! data_get {
+        ($data:ident, $msg:ident, $ctx:ident,$x:ty) => {
+            match $data.get::<$x>() {
+                Some(x) => x.lock().await,
+                None => {
+                    $msg.channel_id
+                        .say(&$ctx, "There was a problem getting the $x :/")
+                        .await?;
+                    return Ok(());
+                }
+            }
+        };
+    }
+}
