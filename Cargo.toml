@@ -1,6 +1,6 @@
 [package]
 name = "veloren_server_bot"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Songtronix <contact@songtronix.com>"]
 edition = "2018"
 publish = false
@@ -15,9 +15,9 @@ fern = { version = "0.6.0", features = ["colored"] }
 chrono = "0.4.19"
 log = "0.4.14"
 # Config
-config = { version = "0.10.1", features = ["toml"] }
+config = { version = "0.10.1", features = ["yaml"] }
 serde = { version = "1.0.124", features = ["derive"] }
-toml = "0.5.8"
+serde_yaml = "0.8.17"
 # Error handling
 anyhow = "1.0.38"
 # Discord

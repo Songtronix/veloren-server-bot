@@ -28,9 +28,10 @@ impl FromStr for Operation {
 }
 
 #[command]
-#[description = "Switch the branch of the Veloren server. Will restart the server."]
-async fn branch(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    let branch = args.single::<String>()?;
+#[aliases("branch", "commit")]
+#[description = "Switch the revision (Branch/Commit) of the Veloren server. Will restart the server."]
+async fn rev(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let rev = args.single::<String>()?;
 
     let data = ctx.data.read().await;
     let mut server = data_get!(data, msg, ctx, Server);
@@ -38,25 +39,25 @@ async fn branch(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
 
     let mut edit_msg = msg
         .channel_id
-        .say(&ctx.http, "Checking if branch exists...")
+        .say(&ctx.http, "Checking if rev exists...")
         .await?;
 
-    match state.set_head(&branch).await? {
+    match state.set_rev(&rev).await? {
         true => {
             edit_msg
                 .edit(&ctx.http, |m| {
                     m.content(format!(
-                        "Changed to branch '{}'. Check with `status` for servers' progress.",
-                        &branch
+                        "Changed to '{}'. Check with `status` for servers' progress.",
+                        &rev
                     ))
                 })
                 .await?;
-            server.restart(state.head()).await;
+            server.restart(state.rev()).await;
         }
         false => {
             edit_msg
                 .edit(&ctx.http, |m| {
-                    m.content(format!("Branch '{}' does not exist!", &branch))
+                    m.content(format!("'{}' does not exist!", &rev))
                 })
                 .await?;
         }
@@ -91,14 +92,14 @@ async fn logs(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
-#[description = "Start Veloren Server. Will recompile, change branch, fetch updates as needed."]
+#[description = "Start Veloren Server. Will recompile, change branch/commit, fetch updates as needed."]
 async fn start(ctx: &Context, msg: &Message) -> CommandResult {
     let data = ctx.data.read().await;
 
     let mut server = data_get!(data, msg, ctx, Server);
     let state = data_get!(data, msg, ctx, State);
 
-    server.start(state.head()).await;
+    server.start(state.rev()).await;
 
     msg.channel_id
         .say(
@@ -127,19 +128,19 @@ async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
-#[description = "Restart Veloren Server. Will recompile, change branch, fetch updates as needed."]
+#[description = "Restart Veloren Server. Will recompile, change branch/commit, fetch updates as needed."]
 async fn restart(ctx: &Context, msg: &Message) -> CommandResult {
     let data = ctx.data.read().await;
 
     let mut server = data_get!(data, msg, ctx, Server);
     let state = data_get!(data, msg, ctx, State);
 
-    server.restart(state.head()).await;
+    server.restart(state.rev()).await;
 
     msg.channel_id
         .say(
             &ctx.http,
-            "Restarted Veloren Server. Check with `status` for it's progress.",
+            "Restarted Veloren Server. Check with `status` for its progress.",
         )
         .await?;
 

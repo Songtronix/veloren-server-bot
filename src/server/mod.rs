@@ -1,5 +1,5 @@
 mod task;
-use crate::utils;
+use crate::{state::Rev, utils};
 
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
@@ -69,17 +69,17 @@ impl Server {
         })
     }
 
-    async fn run(&mut self, branch: &str) {
+    async fn run(&mut self, rev: &Rev) {
         if self.task.is_none() {
             let (send, recv) = mpsc::unbounded_channel();
             self.reporter = Some(recv);
-            self.task = Some(Task::new(Self::setup(send, branch.to_string())));
+            self.task = Some(Task::new(Self::setup(send, rev.clone())));
         }
     }
 
-    pub async fn start(&mut self, branch: &str) {
+    pub async fn start(&mut self, rev: &Rev) {
         if !self.running().await {
-            self.run(branch).await;
+            self.run(rev).await;
         }
     }
 
@@ -87,9 +87,9 @@ impl Server {
         self.cancel().await;
     }
 
-    pub async fn restart(&mut self, branch: &str) {
+    pub async fn restart(&mut self, rev: &Rev) {
         self.stop().await;
-        self.run(branch).await;
+        self.run(rev).await;
     }
 
     async fn cancel(&mut self) {
@@ -121,10 +121,10 @@ impl Server {
         !matches!(self.status().await, ServerStatus::Offline)
     }
 
-    async fn setup(reporter: mpsc::UnboundedSender<ServerStatus>, branch: String) {
+    async fn setup(reporter: mpsc::UnboundedSender<ServerStatus>, rev: Rev) {
         let mut reporter = Some(reporter);
         // Update Repository.
-        Self::run_update(&mut reporter, &branch).await;
+        Self::run_update(&mut reporter, &rev).await;
         // Query new version
         Self::run_version(&mut reporter).await;
         // Compile server
@@ -133,7 +133,10 @@ impl Server {
         Self::run_server(&mut reporter).await;
     }
 
-    async fn run_update(report: &mut Option<mpsc::UnboundedSender<ServerStatus>>, branch: &str) {
+    async fn run_update(
+        report: &mut Option<mpsc::UnboundedSender<ServerStatus>>,
+        rev: &Rev,
+    ) {
         let reporter = match report {
             Some(report) => report,
             None => return,
@@ -148,22 +151,29 @@ impl Server {
 
         let mut checkout = Command::new("git");
         checkout.current_dir(PathBuf::from("veloren"));
-        checkout.args(&["checkout", branch]);
+        checkout.args(&["checkout", &rev.to_string()]);
 
         let mut reset = Command::new("git");
         reset.current_dir(PathBuf::from("veloren"));
-        reset.args(&["reset", "--hard", &format!("origin/{}", branch)]);
+        match rev {
+            Rev::Branch(branch) => {
+                reset.args(&["reset", "--hard", &format!("origin/{}", branch)]);
+            }
+            Rev::Commit(commit) => {
+                reset.args(&["reset", "--hard", &commit]);
+            }
+        }
 
         if let Err(e) = utils::execute("git", fetch).await {
             log::error!("Failed to fetch updates: {}", e);
             let _ = reporter.send(ServerStatus::UpdateFailed);
             report.take();
         } else if let Err(e) = utils::execute("git", checkout).await {
-            log::error!("Failed to fetch updates: {}", e);
+            log::error!("Failed to checkout updates: {}", e);
             let _ = reporter.send(ServerStatus::UpdateFailed);
             report.take();
         } else if let Err(e) = utils::execute("git", reset).await {
-            log::error!("Failed to fetch updates: {}", e);
+            log::error!("Failed to reset to updates: {}", e);
             let _ = reporter.send(ServerStatus::UpdateFailed);
             report.take();
         }

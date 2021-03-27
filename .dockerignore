@@ -2,3 +2,5 @@
 /veloren
 settings.toml
 data
+*.yaml
+*.yml

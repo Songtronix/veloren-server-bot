@@ -1,9 +1,11 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use config::{Config, ConfigError, Environment, File};
 use serde::{Deserialize, Serialize};
 use serenity::prelude::TypeMapKey;
 use std::{path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
+
+const FILENAME: &'static str = "settings.yaml";
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
@@ -44,7 +46,7 @@ impl Settings {
         let mut s = Config::new();
 
         let settings_path =
-            std::env::var("BOT_SETTINGS").unwrap_or_else(|_| "settings.toml".to_string());
+            std::env::var("BOT_SETTINGS").unwrap_or_else(|_| FILENAME.to_string());
 
         // Start off by merging in the "default" configuration file
         s.merge(File::with_name(&settings_path))?;
@@ -61,12 +63,16 @@ impl Settings {
         use tokio::io::AsyncWriteExt;
 
         let settings_path =
-            std::env::var("BOT_SETTINGS").unwrap_or_else(|_| "settings.toml".to_string());
+            std::env::var("BOT_SETTINGS").unwrap_or_else(|_| FILENAME.to_string());
 
         let _ = tokio::fs::create_dir_all(PathBuf::from(&settings_path).parent().unwrap()).await;
         let mut file = tokio::fs::File::create(&settings_path).await?;
-        file.write_all(toml::to_string_pretty(&self)?.as_bytes())
-            .await?;
+        file.write_all(
+            serde_yaml::to_string(&self)
+                .context("Failed to serialize settings")?
+                .as_bytes(),
+        )
+        .await?;
         file.sync_all().await?;
         Ok(())
     }

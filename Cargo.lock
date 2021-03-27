@@ -225,6 +225,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dtoa"
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88d7ed2934d741c6b37e33e3832298e8850b53fd2d2bea03873375596c7cea4e"
+
+[[package]]
 name = "encoding_rs"
 version = "0.8.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1013,6 +1019,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_yaml"
+version = "0.8.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15654ed4ab61726bf918a39cb8d98a2e2995b002387807fa6ba58fdf7f59bb23"
+dependencies = [
+ "dtoa",
+ "linked-hash-map 0.5.3",
+ "serde 1.0.124",
+ "yaml-rust",
+]
+
+[[package]]
 name = "serenity"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1344,7 +1362,7 @@ checksum = "f4bf03e0ca70d626ecc4ba6b0763b934b6f2976e8c744088bb3c1d646fbb1ad0"
 
 [[package]]
 name = "veloren_server_bot"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1354,10 +1372,10 @@ dependencies = [
  "lazy_static",
  "log",
  "serde 1.0.124",
+ "serde_yaml",
  "serenity",
  "tokio",
  "tokio-stream",
- "toml",
 ]
 
 [[package]]
@@ -1527,9 +1545,9 @@ dependencies = [
 
 [[package]]
 name = "yaml-rust"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39f0c922f1a334134dc2f7a8b67dc5d25f0735263feec974345ff706bcf20b0d"
+checksum = "56c1936c4cc7a1c9ab21a1ebb602eb942ba868cbd44a99cb7cdc5892335e1c85"
 dependencies = [
  "linked-hash-map 0.5.3",
 ]

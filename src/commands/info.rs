@@ -5,7 +5,11 @@ use serenity::{
     utils::MessageBuilder,
 };
 
-use crate::{server::Server, settings::Settings, state::State};
+use crate::{
+    server::Server,
+    settings::Settings,
+    state::{Rev, State},
+};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -61,18 +65,30 @@ async fn status(ctx: &Context, msg: &Message) -> CommandResult {
                     MessageBuilder::new().push_mono(status).build(),
                     true,
                 );
-                if let Some(version) = server.version() {
-                    e.field(
-                        "Commit",
-                        MessageBuilder::new().push_mono(version).build(),
-                        true,
-                    );
+                match state.rev() {
+                    Rev::Branch(branch) => {
+                        if let Some(version) = server.version() {
+                            e.field(
+                                "Commit",
+                                MessageBuilder::new().push_mono(version).build(),
+                                true,
+                            );
+                        }
+                        e.field(
+                            "Branch",
+                            MessageBuilder::new().push_mono(branch).build(),
+                            false,
+                        );
+                    }
+                    Rev::Commit(commit) => {
+                        e.field(
+                            "Commit",
+                            MessageBuilder::new().push_mono(commit).build(),
+                            false,
+                        );
+                    }
                 }
-                e.field(
-                    "Branch",
-                    MessageBuilder::new().push_mono(state.head()).build(),
-                    false,
-                );
+
                 e.field(
                     "Address",
                     MessageBuilder::new()

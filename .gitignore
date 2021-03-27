@@ -1,5 +1,6 @@
 /target
 /veloren
-settings.toml
 data
 *.log
+*.toml
+*.yaml
