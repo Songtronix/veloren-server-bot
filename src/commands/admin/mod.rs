@@ -66,12 +66,12 @@ async fn logs(ctx: &Context, msg: &Message) -> CommandResult {
             m.content(
                 MessageBuilder::new()
                     .push_bold_line("Keep these credentials secure!")
-                    .push_bold("Username: ")
-                    .push_line(&settings.web_username)
-                    .push_bold("Password: ")
-                    .push_mono(&settings.web_password)
-                    .push_bold("Url: ")
-                    .push_mono(&settings.web_address)
+                    .push("Username: ")
+                    .push_mono_line(&settings.web_username)
+                    .push("Password: ")
+                    .push_mono_line(&settings.web_password)
+                    .push("Url: ")
+                    .push_line(&settings.web_address)
                     .build(),
             )
         })

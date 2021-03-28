@@ -5,15 +5,20 @@ services:
     build: .
     container_name: veloren-server-bot
     ports:
+      # Veloren
       - "14004:14004"
+      # Veloren Metrics
       - "14005:14005"
+      # Tracy Metrics
+      - "8086:8086"
     restart: on-failure:0
     volumes:
       - "./data/veloren:/veloren"
       - "./data/settings:/data"
       - logs:/data/logs
     environment:
-      - BOT_SETTINGS=data/settings.toml
+      - BOT_SETTINGS=data/settings.yaml
+      - BOT_STATE=data/state.yaml
       - BOT_LOGS=data/logs/bot.log
   frontail:
     image: mthenw/frontail

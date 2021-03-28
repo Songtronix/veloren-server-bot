@@ -187,7 +187,7 @@ impl Server {
         // Compile server
         Self::run_compile(&mut reporter, &cargo_args).await;
         // Start Server
-        Self::run_server(&mut reporter, &args, &envs).await;
+        Self::run_server(&mut reporter, &args, &cargo_args, &envs).await;
     }
 
     async fn run_update(report: &mut Option<mpsc::UnboundedSender<ServerStatus>>, rev: &Rev) {
@@ -286,6 +286,7 @@ impl Server {
     async fn run_server(
         report: &mut Option<mpsc::UnboundedSender<ServerStatus>>,
         args: &LinkedHashSet<String>,
+        cargo_args: &LinkedHashSet<String>,
         envs: &HashMap<String, String>,
     ) {
         let reporter = match report {
@@ -298,6 +299,7 @@ impl Server {
         cmd.current_dir(PathBuf::from("veloren"));
         cmd.arg("run");
         cmd.args(&["--bin", "veloren-server-cli"]);
+        cmd.args(cargo_args);
         cmd.arg("--");
         cmd.args(args);
 
