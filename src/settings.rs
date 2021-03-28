@@ -5,7 +5,7 @@ use serenity::prelude::TypeMapKey;
 use std::{path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
 
-const FILENAME: &'static str = "settings.yaml";
+const FILENAME: &str = "settings.yaml";
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
@@ -16,10 +16,12 @@ pub struct Settings {
     pub owner: u64,
     /// Command prefix
     pub prefix: String,
-    /// The Website to access the logs.
-    pub web_address: String,
+    /// The Username to access the logs.
+    pub web_username: String,
     /// The Password to access the logs.
     pub web_password: String,
+    /// The Website to access the logs.
+    pub web_address: String,
     /// Gameservers's address
     pub gameserver_address: String,
 }
@@ -31,6 +33,7 @@ impl Default for Settings {
             owner: 999999999,
             prefix: String::from("~"),
             web_address: String::from("WEB_LOGS_WEBSITE_HERE"),
+            web_username: String::from("WEB_LOGS_USERNAME_HERE"),
             web_password: String::from("WEB_LOGS_PASSWORD_HERE"),
             gameserver_address: String::from("GAMESERVER_ADDRESS_HERE"),
         }
@@ -45,8 +48,7 @@ impl Settings {
     pub fn new() -> Result<Self, ConfigError> {
         let mut s = Config::new();
 
-        let settings_path =
-            std::env::var("BOT_SETTINGS").unwrap_or_else(|_| FILENAME.to_string());
+        let settings_path = std::env::var("BOT_SETTINGS").unwrap_or_else(|_| FILENAME.to_string());
 
         // Start off by merging in the "default" configuration file
         s.merge(File::with_name(&settings_path))?;
@@ -62,8 +64,7 @@ impl Settings {
     pub async fn save(&self) -> Result<()> {
         use tokio::io::AsyncWriteExt;
 
-        let settings_path =
-            std::env::var("BOT_SETTINGS").unwrap_or_else(|_| FILENAME.to_string());
+        let settings_path = std::env::var("BOT_SETTINGS").unwrap_or_else(|_| FILENAME.to_string());
 
         let _ = tokio::fs::create_dir_all(PathBuf::from(&settings_path).parent().unwrap()).await;
         let mut file = tokio::fs::File::create(&settings_path).await?;

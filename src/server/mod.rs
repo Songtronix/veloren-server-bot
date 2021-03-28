@@ -5,6 +5,7 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result};
 use futures::FutureExt;
+use linked_hash_set::LinkedHashSet;
 use serenity::prelude::TypeMapKey;
 use task::Task;
 use tokio::sync::Mutex;
@@ -69,17 +70,35 @@ impl Server {
         })
     }
 
-    async fn run(&mut self, rev: &Rev) {
+    async fn run(
+        &mut self,
+        rev: &Rev,
+        args: &LinkedHashSet<String>,
+        cargo_args: &LinkedHashSet<String>,
+        envs: &HashMap<String, String>,
+    ) {
         if self.task.is_none() {
             let (send, recv) = mpsc::unbounded_channel();
             self.reporter = Some(recv);
-            self.task = Some(Task::new(Self::setup(send, rev.clone())));
+            self.task = Some(Task::new(Self::setup(
+                send,
+                rev.clone(),
+                args.clone(),
+                cargo_args.clone(),
+                envs.clone(),
+            )));
         }
     }
 
-    pub async fn start(&mut self, rev: &Rev) {
+    pub async fn start(
+        &mut self,
+        rev: &Rev,
+        args: &LinkedHashSet<String>,
+        cargo_args: &LinkedHashSet<String>,
+        envs: &HashMap<String, String>,
+    ) {
         if !self.running().await {
-            self.run(rev).await;
+            self.run(rev, args, cargo_args, envs).await;
         }
     }
 
@@ -87,9 +106,15 @@ impl Server {
         self.cancel().await;
     }
 
-    pub async fn restart(&mut self, rev: &Rev) {
+    pub async fn restart(
+        &mut self,
+        rev: &Rev,
+        args: &LinkedHashSet<String>,
+        cargo_args: &LinkedHashSet<String>,
+        envs: &HashMap<String, String>,
+    ) {
         self.stop().await;
-        self.run(rev).await;
+        self.run(rev, args, cargo_args, envs).await;
     }
 
     async fn cancel(&mut self) {
@@ -121,22 +146,51 @@ impl Server {
         !matches!(self.status().await, ServerStatus::Offline)
     }
 
-    async fn setup(reporter: mpsc::UnboundedSender<ServerStatus>, rev: Rev) {
+    pub async fn clean(
+        &mut self,
+        rev: &Rev,
+        args: &LinkedHashSet<String>,
+        cargo_args: &LinkedHashSet<String>,
+        envs: &HashMap<String, String>,
+    ) -> bool {
+        // Stop server
+        self.stop().await;
+
+        // Clean
+        log::info!("Cleaning...");
+        let mut cmd = Command::new("cargo");
+        cmd.current_dir(PathBuf::from("veloren"));
+        cmd.arg("clean");
+
+        if let Err(e) = utils::execute("cargo", cmd).await {
+            log::error!("Failed to clean: {}", e);
+            return false;
+        }
+
+        // Start
+        self.start(&rev, &args, &cargo_args, &envs).await;
+        true
+    }
+
+    async fn setup(
+        reporter: mpsc::UnboundedSender<ServerStatus>,
+        rev: Rev,
+        args: LinkedHashSet<String>,
+        cargo_args: LinkedHashSet<String>,
+        envs: HashMap<String, String>,
+    ) {
         let mut reporter = Some(reporter);
         // Update Repository.
         Self::run_update(&mut reporter, &rev).await;
         // Query new version
         Self::run_version(&mut reporter).await;
         // Compile server
-        Self::run_compile(&mut reporter).await;
+        Self::run_compile(&mut reporter, &cargo_args).await;
         // Start Server
-        Self::run_server(&mut reporter).await;
+        Self::run_server(&mut reporter, &args, &envs).await;
     }
 
-    async fn run_update(
-        report: &mut Option<mpsc::UnboundedSender<ServerStatus>>,
-        rev: &Rev,
-    ) {
+    async fn run_update(report: &mut Option<mpsc::UnboundedSender<ServerStatus>>, rev: &Rev) {
         let reporter = match report {
             Some(report) => report,
             None => return,
@@ -204,18 +258,23 @@ impl Server {
         }
     }
 
-    async fn run_compile(report: &mut Option<mpsc::UnboundedSender<ServerStatus>>) {
+    async fn run_compile(
+        report: &mut Option<mpsc::UnboundedSender<ServerStatus>>,
+        cargo_args: &LinkedHashSet<String>,
+    ) {
         let reporter = match report {
             Some(report) => report,
             None => return,
         };
         let _ = reporter.send(ServerStatus::Compiling);
 
-        log::info!("Compiling...");
         let mut cmd = Command::new("cargo");
+        cmd.current_dir(PathBuf::from("veloren"));
         cmd.arg("build");
         cmd.args(&["--bin", "veloren-server-cli"]);
-        cmd.current_dir(PathBuf::from("veloren"));
+        cmd.args(cargo_args);
+
+        log::info!("Compiling... [{:?}]", cmd);
 
         if let Err(e) = utils::execute("cargo", cmd).await {
             log::error!("Failed to compile: {}", e);
@@ -224,28 +283,27 @@ impl Server {
         }
     }
 
-    async fn run_server(report: &mut Option<mpsc::UnboundedSender<ServerStatus>>) {
+    async fn run_server(
+        report: &mut Option<mpsc::UnboundedSender<ServerStatus>>,
+        args: &LinkedHashSet<String>,
+        envs: &HashMap<String, String>,
+    ) {
         let reporter = match report {
             Some(report) => report,
             None => return,
         };
         let _ = reporter.send(ServerStatus::Online);
 
-        log::info!("Starting Veloren Server...");
         let mut cmd = Command::new("cargo");
+        cmd.current_dir(PathBuf::from("veloren"));
         cmd.arg("run");
         cmd.args(&["--bin", "veloren-server-cli"]);
         cmd.arg("--");
-        cmd.arg("-b");
-        cmd.current_dir(PathBuf::from("veloren"));
+        cmd.args(args);
 
-        let mut envs = HashMap::new();
-        envs.insert("RUST_BACKTRACE", "1");
-        envs.insert(
-            "RUST_LOG",
-            "debug,uvth=error,rustls=error,tiny_http=warn,veloren_network=warn,dot_vox=warn",
-        );
         cmd.envs(envs);
+
+        log::info!("Starting Veloren Server... [{:?}]", cmd);
 
         if let Err(e) = utils::execute("veloren", cmd).await {
             log::error!("Failed to start server: {}", e);

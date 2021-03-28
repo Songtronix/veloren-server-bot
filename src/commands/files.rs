@@ -128,7 +128,7 @@ async fn files(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
                     file.write_all(&content).await?;
                     file.sync_all().await?;
 
-                    server.start(state.rev()).await;
+                    server.start(state.rev(), state.args(), state.cargo_args(), state.envs()).await;
 
                     msg.channel_id.say(&ctx, "File uploaded and server restarted.").await?;
                 }
@@ -145,7 +145,9 @@ async fn files(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
         Operation::Remove => {
             server.stop().await;
             tokio::fs::remove_file(file.0).await?;
-            server.start(state.rev()).await;
+            server
+                .start(state.rev(), state.args(), state.cargo_args(), state.envs())
+                .await;
 
             msg.channel_id
                 .say(&ctx, "File removed and server restarted.")

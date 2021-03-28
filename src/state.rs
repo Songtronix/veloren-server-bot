@@ -1,11 +1,18 @@
 use anyhow::{Context, Result};
 use config::{Config, ConfigError, File};
+use linked_hash_set::LinkedHashSet;
 use serde::{Deserialize, Serialize};
 use serenity::{model::id::UserId, prelude::TypeMapKey};
-use std::{collections::HashSet, fmt::Display, path::PathBuf, process::Stdio, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+    path::PathBuf,
+    process::Stdio,
+    sync::Arc,
+};
 use tokio::{process::Command, sync::Mutex};
 
-const FILENAME: &'static str  = "state.yaml";
+const FILENAME: &str = "state.yaml";
 
 /// Bot state which is not intended to be edited manually.
 #[derive(Debug, Serialize, Deserialize)]
@@ -15,6 +22,12 @@ pub struct State {
     rev: Rev,
     /// Admins which are allowed to modify the server.
     admins: HashSet<u64>,
+    /// Arguments passed to the gameserver.
+    args: LinkedHashSet<String>,
+    /// Arguments passed to cargo.
+    cargo: LinkedHashSet<String>,
+    /// Environment variables passed to the gameserver.
+    envs: HashMap<String, String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Rev {
@@ -37,9 +50,20 @@ impl Display for Rev {
 
 impl Default for State {
     fn default() -> Self {
+        let mut envs = HashMap::new();
+        envs.insert("RUST_BACKTRACE".to_string(), "1".to_string());
+        envs.insert(
+            "RUST_LOG".to_string(),
+            "debug,uvth=error,rustls=error,tiny_http=warn,veloren_network=warn,dot_vox=warn"
+                .to_string(),
+        );
+
         Self {
             rev: Rev::Branch("master".into()),
             admins: HashSet::new(),
+            args: LinkedHashSet::new(),
+            cargo: LinkedHashSet::new(),
+            envs,
         }
     }
 }
@@ -68,6 +92,21 @@ impl State {
     /// Returns the git head
     pub fn rev(&self) -> &Rev {
         &self.rev
+    }
+
+    /// Gameserver arguments
+    pub fn args(&self) -> &LinkedHashSet<String> {
+        &self.args
+    }
+
+    /// Cargo arguments
+    pub fn cargo_args(&self) -> &LinkedHashSet<String> {
+        &self.cargo
+    }
+
+    /// Gameserver Environment Variables
+    pub fn envs(&self) -> &HashMap<String, String> {
+        &self.envs
     }
 
     pub async fn set_rev<T: ToString>(&mut self, rev: T) -> Result<bool> {
@@ -112,6 +151,82 @@ impl State {
         }
 
         Ok(false)
+    }
+
+    pub async fn add_arg(&mut self, arg: &str) -> Result<()> {
+        self.args.insert(arg.to_string());
+        self.save().await?;
+        Ok(())
+    }
+
+    pub async fn add_args(&mut self, args: HashSet<String>) -> Result<()> {
+        self.args.extend(args);
+        self.save().await?;
+        Ok(())
+    }
+
+    pub async fn remove_arg(&mut self, arg: &str) -> Result<()> {
+        self.args.remove(arg);
+        self.save().await?;
+        Ok(())
+    }
+
+    pub async fn reset_args(&mut self) -> Result<()> {
+        self.args.clear();
+        // Add back default gameserver arguments.
+        self.args.insert("-b".to_string());
+        self.save().await?;
+        Ok(())
+    }
+
+    pub async fn add_cargo_arg(&mut self, arg: &str) -> Result<()> {
+        self.cargo.insert(arg.to_string());
+        self.save().await?;
+        Ok(())
+    }
+
+    pub async fn add_cargo_args(&mut self, args: HashSet<String>) -> Result<()> {
+        self.cargo.extend(args);
+        self.save().await?;
+        Ok(())
+    }
+
+    pub async fn remove_cargo_arg(&mut self, arg: &str) -> Result<()> {
+        self.cargo.remove(arg);
+        self.save().await?;
+        Ok(())
+    }
+
+    pub async fn clear_cargo_args(&mut self) -> Result<()> {
+        self.cargo.clear();
+        self.save().await?;
+        Ok(())
+    }
+
+    pub async fn add_env(&mut self, name: &str, value: &str) -> Result<()> {
+        self.envs.insert(name.to_string(), value.to_string());
+        self.save().await?;
+        Ok(())
+    }
+
+    pub async fn remove_env(&mut self, name: &str) -> Result<()> {
+        self.envs.remove(name);
+        self.save().await?;
+        Ok(())
+    }
+
+    pub async fn reset_envs(&mut self) -> Result<()> {
+        self.envs.clear();
+        // Add back default envs.
+        self.envs
+            .insert("RUST_BACKTRACE".to_string(), "1".to_string());
+        self.envs.insert(
+            "RUST_LOG".to_string(),
+            "debug,uvth=error,rustls=error,tiny_http=warn,veloren_network=warn,dot_vox=warn"
+                .to_string(),
+        );
+        self.save().await?;
+        Ok(())
     }
 
     /// adds an admin and saves it to the settings

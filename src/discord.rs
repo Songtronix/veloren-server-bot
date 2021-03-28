@@ -43,7 +43,7 @@ impl EventHandler for Handler {
 struct Info;
 
 #[group]
-#[commands(start, stop, restart, rev, logs, files)]
+#[commands(start, stop, restart, rev, envs, args, cargo, prune, logs, files)]
 #[checks(Admin)]
 #[description = "All veloren server related commands."]
 struct Admin;
@@ -93,7 +93,7 @@ pub async fn run(settings: Settings, server: Server) -> Result<()> {
             let state = State::default();
             state.save().await?;
             state
-        },
+        }
     };
 
     {

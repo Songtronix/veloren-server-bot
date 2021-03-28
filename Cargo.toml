@@ -23,4 +23,5 @@ anyhow = "1.0.38"
 # Discord
 serenity = { version = "0.10.4", features = ["cache", "framework", "standard_framework", "rustls_backend"] }
 # Other
+linked_hash_set = { version = "0.1.4", features = ["serde"] }
 lazy_static = "1.4.0"
