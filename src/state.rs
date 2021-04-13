@@ -132,6 +132,17 @@ impl State {
             self.save().await?;
             return Ok(true);
         } else {
+            let mut fetch_cmd = Command::new("git");
+            fetch_cmd.current_dir(PathBuf::from("veloren"));
+            fetch_cmd.args(&["fetch", "--all"]);
+
+            fetch_cmd
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .await
+                .context("Failed to fetch repository updates")?;
+
             let mut commit_cmd = Command::new("git");
             commit_cmd.current_dir(PathBuf::from("veloren"));
             commit_cmd.args(&["cat-file", "-e", &rev.to_string()]);
@@ -140,7 +151,8 @@ impl State {
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
                 .status()
-                .await?
+                .await
+                .context("Failed to check if commit exists")?
                 .success();
 
             if commit_exists {
