@@ -1,3 +1,4 @@
+use anyhow::Context as anyhowContext;
 use serenity::prelude::*;
 use serenity::{framework::standard::Args, model::prelude::*};
 use serenity::{
@@ -124,9 +125,9 @@ async fn files(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
                     };
                     server.stop().await;
 
-                    let mut file = tokio::fs::File::create(file.0).await?;
-                    file.write_all(&content).await?;
-                    file.sync_all().await?;
+                    let mut file = tokio::fs::File::create(file.0).await.context("Failed to open file for upload.")?;
+                    file.write_all(&content).await.context("Failed to write file for upload.")?;
+                    file.sync_all().await.context("Failed to sync data for upload.")?;
 
                     server.start(state.rev(), state.args(), state.cargo_args(), state.envs()).await;
 

@@ -5,7 +5,7 @@ FROM lukemathwalker/cargo-chef as planner
 WORKDIR app
 COPY . .
 # Compute a lock-like file for our project
-RUN cargo chef prepare  --recipe-path recipe.json
+RUN cargo chef prepare --recipe-path recipe.json
 
 # Cache dependencies
 FROM lukemathwalker/cargo-chef as cacher

@@ -70,40 +70,25 @@ impl Server {
         })
     }
 
-    async fn run(
-        &mut self,
-        rev: &Rev,
-        args: &LinkedHashSet<String>,
-        cargo_args: &LinkedHashSet<String>,
-        envs: &HashMap<String, String>,
-    ) {
-        if self.task.is_none() {
-            let (send, recv) = mpsc::unbounded_channel();
-            self.reporter = Some(recv);
-            self.task = Some(Task::new(Self::setup(
-                send,
-                rev.clone(),
-                args.clone(),
-                cargo_args.clone(),
-                envs.clone(),
-            )));
-        }
-    }
-
+    /// Returns whether the server has been started or was already running.
     pub async fn start(
         &mut self,
         rev: &Rev,
         args: &LinkedHashSet<String>,
         cargo_args: &LinkedHashSet<String>,
         envs: &HashMap<String, String>,
-    ) {
-        if !self.running().await {
-            self.run(rev, args, cargo_args, envs).await;
-        }
+    ) -> bool {
+        self.run(rev, args, cargo_args, envs).await
     }
 
-    pub async fn stop(&mut self) {
-        self.cancel().await;
+    pub async fn stop(&mut self) -> bool {
+        if let Some(task) = self.task.take() {
+            task.cancel().await;
+            self.status = ServerStatus::Offline;
+            true
+        } else {
+            false
+        }
     }
 
     pub async fn restart(
@@ -115,13 +100,6 @@ impl Server {
     ) {
         self.stop().await;
         self.run(rev, args, cargo_args, envs).await;
-    }
-
-    async fn cancel(&mut self) {
-        if let Some(task) = self.task.take() {
-            task.cancel().await;
-            self.status = ServerStatus::Offline;
-        }
     }
 
     pub async fn status(&mut self) -> ServerStatus {
@@ -140,10 +118,6 @@ impl Server {
 
     pub fn version(&self) -> Option<String> {
         self.version.clone()
-    }
-
-    pub async fn running(&mut self) -> bool {
-        !matches!(self.status().await, ServerStatus::Offline)
     }
 
     pub async fn clean(
@@ -168,8 +142,31 @@ impl Server {
         }
 
         // Start
-        self.start(&rev, &args, &cargo_args, &envs).await;
+        self.run(&rev, &args, &cargo_args, &envs).await;
         true
+    }
+
+    async fn run(
+        &mut self,
+        rev: &Rev,
+        args: &LinkedHashSet<String>,
+        cargo_args: &LinkedHashSet<String>,
+        envs: &HashMap<String, String>,
+    ) -> bool {
+        if self.task.is_none() {
+            let (send, recv) = mpsc::unbounded_channel();
+            self.reporter = Some(recv);
+            self.task = Some(Task::new(Self::setup(
+                send,
+                rev.clone(),
+                args.clone(),
+                cargo_args.clone(),
+                envs.clone(),
+            )));
+            true
+        } else {
+            false
+        }
     }
 
     async fn setup(

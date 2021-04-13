@@ -9,10 +9,12 @@ use serenity::{
 mod args;
 mod cargo;
 mod envs;
+mod files;
 
 pub use args::*;
 pub use cargo::*;
 pub use envs::*;
+pub use files::*;
 
 #[command]
 #[aliases("branch", "commit")]
@@ -88,16 +90,15 @@ async fn start(ctx: &Context, msg: &Message) -> CommandResult {
     let mut server = data_get!(data, msg, ctx, Server);
     let state = data_get!(data, msg, ctx, State);
 
-    server
+    let resp = match server
         .start(state.rev(), state.args(), state.cargo_args(), state.envs())
-        .await;
+        .await
+    {
+        true => "Started Veloren Server. Check with `status` for its progress.",
+        false => "Server is already running.",
+    };
 
-    msg.channel_id
-        .say(
-            &ctx.http,
-            "Started Veloren Server. Check with `status` for its progress.",
-        )
-        .await?;
+    msg.channel_id.say(&ctx.http, resp).await?;
 
     Ok(())
 }
@@ -109,11 +110,12 @@ async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
 
     let mut server = data_get!(data, msg, ctx, Server);
 
-    server.stop().await;
+    let resp = match server.stop().await {
+        true => "Stopped the Veloren Server.",
+        false => "Server is already stopped.",
+    };
 
-    msg.channel_id
-        .say(&ctx.http, "Stopped the Veloren Server.")
-        .await?;
+    msg.channel_id.say(&ctx.http, resp).await?;
 
     Ok(())
 }
