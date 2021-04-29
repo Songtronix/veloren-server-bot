@@ -1,6 +1,6 @@
 [package]
 name = "veloren_server_bot"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Songtronix <contact@songtronix.com>"]
 edition = "2018"
 publish = false

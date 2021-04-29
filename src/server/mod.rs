@@ -202,7 +202,7 @@ impl Server {
 
         let mut checkout = Command::new("git");
         checkout.current_dir(PathBuf::from("veloren"));
-        checkout.args(&["checkout", &rev.to_string()]);
+        checkout.args(&["checkout", &rev.to_string(), "-f"]);
 
         let mut reset = Command::new("git");
         reset.current_dir(PathBuf::from("veloren"));
