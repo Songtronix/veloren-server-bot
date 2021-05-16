@@ -175,9 +175,17 @@ async fn files(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
                     )
                     .await?;
             } else {
-                msg.author
+                if let Err(e) = msg
+                    .author
                     .dm(&ctx.http, |m| m.content("File:").add_file(file.0))
-                    .await?;
+                    .await
+                {
+                    msg.author
+                        .dm(&ctx.http, |m| {
+                            m.content(format!("Failed to send file: {}", e))
+                        })
+                        .await?;
+                }
 
                 if !msg.is_private() {
                     msg.channel_id.say(&ctx.http, "File send via DM.").await?;
