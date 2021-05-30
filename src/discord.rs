@@ -4,7 +4,10 @@ use serenity::{
     framework::standard::macros::hook,
     framework::standard::DispatchError,
     framework::standard::Reason,
-    framework::{standard::macros::group, StandardFramework},
+    framework::{
+        standard::{macros::group, CommandResult},
+        StandardFramework,
+    },
     http::Http,
     model::channel::Message,
     model::id::UserId,
@@ -79,6 +82,7 @@ pub async fn run(settings: Settings, server: Server) -> Result<()> {
         .group(&ADMIN_GROUP)
         .group(&OWNER_GROUP)
         .before(before_hook)
+        .after(after_hook)
         .on_dispatch_error(dispatch_error_hook)
         .help(&HELP);
 
@@ -119,16 +123,20 @@ async fn before_hook(ctx: &Context, msg: &Message, _cmd_name: &str) -> bool {
 }
 
 #[hook]
+async fn after_hook(
+    _ctx: &Context,
+    _msg: &Message,
+    command_name: &str,
+    command_result: CommandResult,
+) {
+    if let Err(e) = command_result {
+        log::error!("Command '{}' returned error {:?}", command_name, e);
+    }
+}
+
+#[hook]
 async fn dispatch_error_hook(ctx: &Context, msg: &Message, error: DispatchError) {
     match error {
-        DispatchError::NotEnoughArguments { min, given } => {
-            let s = format!("Need {} arguments, but only got {}.", min, given);
-            let _ = msg.channel_id.say(&ctx, &s).await;
-        }
-        DispatchError::TooManyArguments { max, given } => {
-            let s = format!("Max arguments allowed is {}, but got {}.", max, given);
-            let _ = msg.channel_id.say(&ctx, &s).await;
-        }
         DispatchError::CheckFailed(_failed_check, Reason::User(reason)) => {
             let _ = msg.channel_id.say(&ctx.http, reason).await;
         }
