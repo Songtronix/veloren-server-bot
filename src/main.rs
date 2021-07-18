@@ -56,7 +56,9 @@ async fn main() -> Result<()> {
         cargo_version,
     );
 
-    let server = Server::new().await.context("Failed to create server.")?;
+    let server = Server::new(&settings.repository)
+        .await
+        .context("Failed to create server.")?;
     discord::run(settings, server)
         .await
         .context("Failed to start discord.")

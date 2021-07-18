@@ -24,6 +24,7 @@ async fn rev(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
 
     let data = ctx.data.read().await;
     let mut server = data_get!(data, msg, ctx, Server);
+    let settings = data_get!(data, msg, ctx, Settings);
     let mut state = data_get!(data, msg, ctx, State);
 
     let mut edit_msg = msg
@@ -31,7 +32,7 @@ async fn rev(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
         .say(&ctx.http, "Checking if rev exists...")
         .await?;
 
-    match state.set_rev(&rev).await? {
+    match state.set_rev(&rev, &settings.repository).await? {
         true => {
             edit_msg
                 .edit(&ctx.http, |m| {
