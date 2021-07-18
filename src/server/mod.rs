@@ -54,10 +54,10 @@ impl TypeMapKey for Server {
 }
 
 impl Server {
-    pub async fn new() -> Result<Self> {
+    pub async fn new(repo: impl ToString) -> Result<Self> {
         // First setup
         if !PathBuf::from("veloren/Cargo.toml").exists() {
-            Self::clone_repository()
+            Self::clone_repository(repo)
                 .await
                 .context("Failed to clone repository for the first time.")?;
         }
@@ -311,11 +311,11 @@ impl Server {
         }
     }
 
-    async fn clone_repository() -> Result<()> {
+    async fn clone_repository(repo: impl ToString) -> Result<()> {
         log::info!("Cloning repository...");
         let mut cmd = Command::new("git");
         cmd.arg("clone");
-        cmd.arg("https://gitlab.com/veloren/veloren.git");
+        cmd.arg(repo.to_string());
 
         utils::execute("git", cmd).await?;
 

@@ -7,13 +7,17 @@ use tokio::sync::Mutex;
 
 const FILENAME: &str = "settings.yaml";
 
+/// Settings which can be adjusted before first launch.
+/// Some cannot be changed after the fact and require manual work to adjust after first setup.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
-    /// Discord's bot token
+    /// Discord's bot token.
     pub token: String,
-    /// Discord account id which owns the bot
+    /// Discord account id which owns the bot.
     pub owner: u64,
+    /// The "git clone" repository url.
+    pub repository: String,
     /// Command prefix
     pub prefix: String,
     /// The Username to access the logs.
@@ -22,7 +26,7 @@ pub struct Settings {
     pub web_password: String,
     /// The Website to access the logs.
     pub web_address: String,
-    /// Gameservers's address
+    /// Gameservers's address.
     pub gameserver_address: String,
 }
 
@@ -31,6 +35,7 @@ impl Default for Settings {
         Self {
             token: String::from("DISCORD_BOT_TOKEN_HERE"),
             owner: 999999999,
+            repository: String::from("https://gitlab.com/veloren/veloren.git"),
             prefix: String::from("~"),
             web_address: String::from("WEB_LOGS_WEBSITE_HERE"),
             web_username: String::from("WEB_LOGS_USERNAME_HERE"),

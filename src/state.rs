@@ -15,6 +15,7 @@ use tokio::{process::Command, sync::Mutex};
 const FILENAME: &str = "state.yaml";
 
 /// Bot state which is not intended to be edited manually.
+/// Can be adjusted at runtime and post initial setup.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct State {
@@ -109,14 +110,14 @@ impl State {
         &self.envs
     }
 
-    pub async fn set_rev<T: ToString>(&mut self, rev: T) -> Result<bool> {
+    pub async fn set_rev<T: ToString, Y: ToString>(&mut self, rev: T, repo: Y) -> Result<bool> {
         let mut branch_cmd = Command::new("git");
         branch_cmd.current_dir(PathBuf::from("veloren"));
         branch_cmd.args(&[
             "ls-remote",
             "--exit-code",
             "--heads",
-            "https://gitlab.com/veloren/veloren.git",
+            &repo.to_string(),
             &rev.to_string(),
         ]);
 
