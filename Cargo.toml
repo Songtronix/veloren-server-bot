@@ -7,21 +7,21 @@ publish = false
 
 [dependencies]
 # Async
-tokio = { version = "1.2.0", features = ["macros", "process", "rt-multi-thread", "sync"] }
-tokio-stream = { version = "0.1.4", features = ["io-util"] }
-futures = "0.3.13"
+tokio = { version = "1.12.0", features = ["macros", "process", "rt-multi-thread", "sync"] }
+tokio-stream = { version = "0.1.7", features = ["io-util"] }
+futures = "0.3.17"
 # Logging
 fern = { version = "0.6.0", features = ["colored"] }
 chrono = "0.4.19"
 log = "0.4.14"
 # Config
-config = { version = "0.10.1", features = ["yaml"] }
-serde = { version = "1.0.124", features = ["derive"] }
-serde_yaml = "0.8.17"
+config = { version = "0.11.0", features = ["yaml"] }
+serde = { version = "1.0.130", features = ["derive"] }
+serde_yaml = "0.8.21"
 # Error handling
-anyhow = "1.0.38"
+anyhow = "1.0.44"
 # Discord
-serenity = { version = "0.10.4", features = ["cache", "framework", "standard_framework", "rustls_backend"] }
+serenity = { version = "0.10.9", features = ["cache", "framework", "standard_framework", "rustls_backend"] }
 # Other
 linked_hash_set = { version = "0.1.4", features = ["serde"] }
 lazy_static = "1.4.0"
