@@ -186,8 +186,6 @@ impl State {
 
     pub async fn reset_args(&mut self) -> Result<()> {
         self.args.clear();
-        // Add back default gameserver arguments.
-        self.args.insert("-b".to_string());
         self.save().await?;
         Ok(())
     }
