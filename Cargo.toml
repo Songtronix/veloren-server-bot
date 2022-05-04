@@ -21,7 +21,7 @@ serde_yaml = "0.8.21"
 # Error handling
 anyhow = "1.0.44"
 # Discord
-serenity = { version = "0.10.9", features = ["cache", "framework", "standard_framework", "rustls_backend"] }
+poise = "0.1.0"
 # Other
 linked_hash_set = { version = "0.1.4", features = ["serde"] }
 lazy_static = "1.4.0"

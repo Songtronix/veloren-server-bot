@@ -1,16 +1,15 @@
 use anyhow::{Context, Result};
 use config::{Config, ConfigError, File};
 use linked_hash_set::LinkedHashSet;
+use poise::serenity_prelude::UserId;
 use serde::{Deserialize, Serialize};
-use serenity::{model::id::UserId, prelude::TypeMapKey};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
     path::PathBuf,
     process::Stdio,
-    sync::Arc,
 };
-use tokio::{process::Command, sync::Mutex};
+use tokio::process::Command;
 
 const FILENAME: &str = "state.yaml";
 
@@ -67,10 +66,6 @@ impl Default for State {
             envs,
         }
     }
-}
-
-impl TypeMapKey for State {
-    type Value = Arc<Mutex<State>>;
 }
 
 impl State {

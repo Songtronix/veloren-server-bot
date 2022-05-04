@@ -1,5 +1,5 @@
 /// checks for permission to execute a specific command
-mod checks;
+pub mod checks;
 /// All available discord commands
 mod commands;
 /// discord setup

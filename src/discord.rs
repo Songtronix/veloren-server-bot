@@ -1,95 +1,112 @@
-use serenity::{
-    async_trait,
-    client::bridge::gateway::ShardManager,
-    framework::standard::macros::hook,
-    framework::standard::DispatchError,
-    framework::standard::Reason,
-    framework::{
-        standard::{macros::group, CommandResult},
-        StandardFramework,
-    },
-    http::Http,
-    model::channel::Message,
-    model::id::UserId,
-    model::prelude::OnlineStatus,
-    model::{event::ResumedEvent, gateway::Ready, prelude::Activity},
-    prelude::*,
-};
-use std::{collections::HashSet, sync::Arc};
+use crate::{commands::*, server::Server, settings::Settings, state::State, Result};
+use poise::serenity_prelude::{self as serenity, Activity, OnlineStatus};
+use tokio::sync::Mutex;
 
-use crate::{checks::*, commands::*, server::Server, settings::Settings, state::State, Result};
+pub type Error = Box<dyn std::error::Error + Send + Sync>;
+pub type Context<'a> = poise::Context<'a, Data, Error>;
 
-pub struct ShardManagerContainer;
-
-impl TypeMapKey for ShardManagerContainer {
-    type Value = Arc<Mutex<ShardManager>>;
+pub struct Data {
+    pub settings: Mutex<Settings>,
+    pub state: Mutex<State>,
+    pub server: Mutex<Server>,
 }
 
-struct Handler(String);
-
-#[async_trait]
-impl EventHandler for Handler {
-    async fn ready(&self, ctx: Context, ready: Ready) {
-        log::info!("Connected as {}", ready.user.name);
-        ctx.set_presence(None, OnlineStatus::Online).await;
-        ctx.set_activity(Activity::playing(&self.0)).await;
+async fn event_listener(
+    ctx: &serenity::Context,
+    event: &poise::Event<'_>,
+    _framework: &poise::Framework<Data, Error>,
+    user_data: &Data,
+) -> Result<(), Error> {
+    match event {
+        poise::Event::Ready { data_about_bot } => {
+            log::info!("Connected as {}", data_about_bot.user.name);
+            ctx.set_presence(None, OnlineStatus::Online).await;
+            ctx.set_activity(Activity::playing(
+                user_data.settings.lock().await.gameserver_address.clone(),
+            ))
+            .await;
+        }
+        poise::Event::Resume { event: _ } => {
+            log::info!("Connection to discord resumed.");
+        }
+        _ => {}
     }
 
-    async fn resume(&self, _ctx: Context, _: ResumedEvent) {
-        log::info!("Connection to discord resumed.");
-    }
+    Ok(())
 }
-
-#[group]
-#[commands(about, status)]
-#[description = "General information about the bot/server."]
-struct Info;
-
-#[group]
-#[commands(start, stop, restart, rev, envs, args, cargo, prune, logs, files)]
-#[checks(Admin)]
-#[description = "All veloren server related commands."]
-struct Admin;
-
-#[group]
-#[commands(admin, quit)]
-#[owners_only]
-#[description = "Commands which only the Bot Owner can execute."]
-struct Owner;
 
 pub async fn run(settings: Settings, server: Server) -> Result<()> {
-    let http = Http::new_with_token(&settings.token);
+    let options = poise::FrameworkOptions {
+        commands: vec![
+            info::about(),
+            info::status(),
+            help::help(),
+            owner::quit(),
+            poise::Command {
+                subcommands: vec![owner::add(), owner::remove(), owner::list()],
+                ..owner::admin()
+            },
+            owner::admin(),
+            owner::register(),
+            admin::rev(),
+            admin::logs(),
+            admin::start(),
+            admin::stop(),
+            admin::prune(),
+            admin::restart(),
+            admin::exec::exec(),
+            poise::Command {
+                subcommands: vec![
+                    admin::args::add(),
+                    admin::args::remove(),
+                    admin::args::list(),
+                    admin::args::reset(),
+                ],
+                ..admin::args::args()
+            },
+            poise::Command {
+                subcommands: vec![
+                    admin::cargo::add(),
+                    admin::cargo::remove(),
+                    admin::cargo::list(),
+                    admin::cargo::reset(),
+                ],
+                ..admin::cargo::cargo()
+            },
+            poise::Command {
+                subcommands: vec![
+                    admin::envs::set(),
+                    admin::envs::remove(),
+                    admin::envs::list(),
+                    admin::envs::reset(),
+                ],
+                ..admin::envs::envs()
+            },
+            poise::Command {
+                subcommands: vec![
+                    admin::files::view(),
+                    admin::files::upload(),
+                    admin::files::remove(),
+                ],
+                ..admin::files::files()
+            },
+        ],
+        listener: |ctx, event, framework, user_data| {
+            Box::pin(event_listener(ctx, event, framework, user_data))
+        },
+        on_error: |error| Box::pin(on_error(error)),
+        pre_command: |ctx| Box::pin(pre_command(ctx)),
+        prefix_options: poise::PrefixFrameworkOptions {
+            prefix: Some(String::from("~")),
+            mention_as_prefix: false,
+            edit_tracker: Some(poise::EditTracker::for_timespan(
+                std::time::Duration::from_secs(3600 * 3),
+            )),
+            ..Default::default()
+        },
 
-    // Aquire bot id
-    let bot_id = match http.get_current_application_info().await {
-        Ok(info) => info.id,
-        Err(why) => panic!("Could not access application info: {:?}", why),
+        ..Default::default()
     };
-
-    let mut owners = HashSet::new();
-    owners.insert(UserId(settings.owner));
-
-    let framework = StandardFramework::new()
-        .configure(|c| {
-            c.owners(owners)
-                .prefix(&settings.prefix)
-                .on_mention(Some(bot_id))
-                .case_insensitivity(true)
-                .allow_dm(true)
-                .no_dm_prefix(true)
-        })
-        .group(&INFO_GROUP)
-        .group(&ADMIN_GROUP)
-        .group(&OWNER_GROUP)
-        .before(before_hook)
-        .after(after_hook)
-        .on_dispatch_error(dispatch_error_hook)
-        .help(&HELP);
-
-    let mut client = Client::builder(&settings.token)
-        .event_handler(Handler(settings.gameserver_address.clone()))
-        .framework(framework)
-        .await?;
 
     let state = match State::new() {
         Ok(state) => state,
@@ -100,46 +117,48 @@ pub async fn run(settings: Settings, server: Server) -> Result<()> {
         }
     };
 
-    {
-        let mut data = client.data.write().await;
-        data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
-        data.insert::<Settings>(Arc::new(Mutex::new(settings)));
-        data.insert::<State>(Arc::new(Mutex::new(state)));
-        data.insert::<Server>(Arc::new(Mutex::new(server)));
-    }
+    poise::Framework::build()
+        .token(&settings.token)
+        .user_data_setup(move |_ctx, _ready, _framework| Box::pin(async move {
+            Ok(
+                Data { settings: Mutex::new(settings),
+                    state: Mutex::new(state),
+                    server: Mutex::new(server)
+                }
+            )
+        }))
+        .options(options)
+        .intents(
+            serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT, /* TODO: Remove MESSAGE_CONTENT INTENT  */
+        )
+        .run()
+        .await
+        .unwrap();
 
-    Ok(client.start().await?)
+    Ok(())
 }
 
-#[hook]
-async fn before_hook(ctx: &Context, msg: &Message, _cmd_name: &str) -> bool {
+async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
+    // This is our custom error handler
+    // They are many errors that can occur, so we only handle the ones we want to customize
+    // and forward the rest to the default handler
+    match error {
+        poise::FrameworkError::Setup { error } => panic!("Failed to start bot: {:?}", error),
+        poise::FrameworkError::Command { error, ctx } => {
+            log::error!("Error in command `{}`: {:?}", ctx.command().name, error,);
+        }
+        error => {
+            if let Err(e) = poise::builtins::on_error(error).await {
+                log::error!("Error while handling error: {}", e)
+            }
+        }
+    }
+}
+
+async fn pre_command(ctx: Context<'_>) {
     log::info!(
         "Got command '{}' by user '{}'",
-        msg.content_safe(&ctx.cache).await,
-        msg.author.tag()
+        ctx.command().name,
+        ctx.author().tag()
     );
-
-    true
-}
-
-#[hook]
-async fn after_hook(
-    _ctx: &Context,
-    _msg: &Message,
-    command_name: &str,
-    command_result: CommandResult,
-) {
-    if let Err(e) = command_result {
-        log::error!("Command '{}' returned error {:?}", command_name, e);
-    }
-}
-
-#[hook]
-async fn dispatch_error_hook(ctx: &Context, msg: &Message, error: DispatchError) {
-    match error {
-        DispatchError::CheckFailed(_failed_check, Reason::User(reason)) => {
-            let _ = msg.channel_id.say(&ctx.http, reason).await;
-        }
-        e => log::warn!("Unhandled dispatch error. {:?}", e),
-    }
 }

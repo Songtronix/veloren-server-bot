@@ -1,9 +1,7 @@
 use anyhow::{Context, Result};
 use config::{Config, ConfigError, Environment, File};
 use serde::{Deserialize, Serialize};
-use serenity::prelude::TypeMapKey;
-use std::{path::PathBuf, sync::Arc};
-use tokio::sync::Mutex;
+use std::path::PathBuf;
 
 const FILENAME: &str = "settings.yaml";
 
@@ -43,10 +41,6 @@ impl Default for Settings {
             gameserver_address: String::from("GAMESERVER_ADDRESS_HERE"),
         }
     }
-}
-
-impl TypeMapKey for Settings {
-    type Value = Arc<Mutex<Settings>>;
 }
 
 impl Settings {

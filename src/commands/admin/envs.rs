@@ -1,89 +1,83 @@
-use crate::state::State;
-use serenity::prelude::*;
-use serenity::{framework::standard::Args, model::prelude::*};
-use serenity::{
-    framework::standard::{macros::command, CommandResult},
-    utils::MessageBuilder,
-};
-use std::str::FromStr;
+use crate::discord::Context;
+use crate::discord::Error;
+use poise::serenity_prelude::MessageBuilder;
 
-#[derive(Debug)]
-pub enum EnvOperation {
-    Set,
-    Remove,
-    List,
-    Reset,
+/// Manage environment variables passed to the gameserver.
+#[poise::command(slash_command, check = "crate::checks::is_admin")]
+pub async fn envs(_ctx: Context<'_>) -> Result<(), Error> {
+    // Discord doesn't allow root commands to be invoked. Only Subcommands.
+    Ok(())
 }
 
-impl FromStr for EnvOperation {
-    type Err = &'static str;
+#[derive(Debug, poise::Modal)]
+struct EnvVar {
+    name: String,
+    value: String,
+}
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "set" => Ok(EnvOperation::Set),
-            "remove" | "rm" => Ok(EnvOperation::Remove),
-            "list" | "ls" => Ok(EnvOperation::List),
-            "clear" | "reset" => Ok(EnvOperation::Reset),
-            _ => Err("Unknown Operation"),
-        }
+/// Set an evironment variable.
+#[poise::command(slash_command, check = "crate::checks::is_admin")]
+pub async fn set(
+    ctx: poise::ApplicationContext<'_, crate::discord::Data, crate::discord::Error>,
+) -> Result<(), Error> {
+    let env = <EnvVar as poise::Modal>::execute(ctx).await?;
+
+    let mut state = ctx.data.state.lock().await;
+    state.add_env(&env.name, &env.value).await?;
+
+    poise::send_application_reply(ctx, |m| {
+        m.content(format!(
+            "Set `{}`=`{}` as environment variable.",
+            env.name, env.value
+        ))
+    })
+    .await?;
+
+    Ok(())
+}
+
+/// Remove an Environment Variable
+#[poise::command(slash_command, check = "crate::checks::is_admin")]
+pub async fn remove(
+    ctx: Context<'_>,
+    #[description = "Environment Variable value to remove"] name: String,
+) -> Result<(), Error> {
+    let mut state = ctx.data().state.lock().await;
+
+    state.remove_env(&name).await?;
+    ctx.say(format!(
+        "Removed `{}` from the environment variables.",
+        name
+    ))
+    .await?;
+
+    Ok(())
+}
+
+/// List all Environment Variables
+#[poise::command(slash_command, check = "crate::checks::is_admin")]
+pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
+    let state = ctx.data().state.lock().await;
+
+    let mut response = MessageBuilder::new();
+    response.push_bold_line("Environment variables:");
+    for (env, value) in state.envs() {
+        response.push_mono_line_safe(format!("{} : {}", env, value));
     }
+    if state.envs().is_empty() {
+        response.push_italic_line("No environment variables set.");
+    }
+    ctx.say(response.build()).await?;
+    Ok(())
 }
 
-#[command]
-#[description = r#"Manage environment variables passed to the gameserver.
-Available subcommands:
-`envs set <NAME> <VALUE>` - Add an environment variable.
-`envs remove/rm <NAME>` - Remove an environment variable.
-`envs list/ls` - List all environment variables.
-`envs reset/clear - Resets all environment variables to default.`"#]
-async fn envs(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    let operation = args.single::<EnvOperation>().unwrap_or(EnvOperation::List);
+/// Reset all Environment Variables to default.
+#[poise::command(slash_command, check = "crate::checks::is_admin")]
+pub async fn reset(ctx: Context<'_>) -> Result<(), Error> {
+    let mut state = ctx.data().state.lock().await;
 
-    let data = ctx.data.read().await;
-    let mut state = data_get!(data, msg, ctx, State);
-
-    match operation {
-        EnvOperation::List => {
-            let mut response = MessageBuilder::new();
-            response.push_bold_line("Environment variables:");
-            for (env, value) in state.envs() {
-                response.push_mono_line_safe(format!("{} : {}", env, value));
-            }
-            if state.envs().is_empty() {
-                response.push_italic_line("No environment variables set.");
-            }
-            msg.channel_id.say(&ctx.http, response.build()).await?;
-        }
-        EnvOperation::Set => {
-            let name = args.single::<String>()?;
-            let value = args.single::<String>()?;
-
-            state.add_env(&name, &value).await?;
-            msg.channel_id
-                .say(
-                    &ctx.http,
-                    format!("Set `{}`=`{}` as environment variable.", name, value),
-                )
-                .await?;
-        }
-        EnvOperation::Remove => {
-            let name = args.single::<String>()?;
-
-            state.remove_env(&name).await?;
-            msg.channel_id
-                .say(
-                    &ctx.http,
-                    format!("Removed `{}` from the environment variables.", name),
-                )
-                .await?;
-        }
-        EnvOperation::Reset => {
-            state.reset_envs().await?;
-            msg.channel_id
-                .say(&ctx.http, "Reset all environment variables to default.")
-                .await?;
-        }
-    };
-
+    state.reset_envs().await?;
+    ctx.say("Reset all environment variables to default.")
+        .await?;
     Ok(())
 }
