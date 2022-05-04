@@ -83,7 +83,7 @@ pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
 /// Register application commands in this guild or globally
 ///
 /// Run with no arguments to register in guild, run with argument "global" to register globally.
-#[poise::command(slash_command, hide_in_help, check = "crate::checks::is_owner")]
+#[poise::command(prefix_command, hide_in_help, check = "crate::checks::is_owner")]
 pub async fn register(
     ctx: Context<'_>,
     #[description = "Global or Guild"]

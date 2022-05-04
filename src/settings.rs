@@ -45,19 +45,15 @@ impl Default for Settings {
 
 impl Settings {
     pub fn new() -> Result<Self, ConfigError> {
-        let mut s = Config::new();
-
         let settings_path = std::env::var("BOT_SETTINGS").unwrap_or_else(|_| FILENAME.to_string());
 
-        // Start off by merging in the "default" configuration file
-        s.merge(File::with_name(&settings_path))?;
-
-        // Add in settings from the environment (with a prefix of BOT)
-        // Eg.. `BOT_DEBUG=1` would set the `debug` key
-        s.merge(Environment::with_prefix("BOT"))?;
+        let s = Config::builder()
+            .add_source(File::with_name(&settings_path))
+            .add_source(Environment::with_prefix("BOT"))
+            .build()?;
 
         // Deserialize entire configuration
-        s.try_into()
+        s.try_deserialize()
     }
 
     pub async fn save(&self) -> Result<()> {

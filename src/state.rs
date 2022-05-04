@@ -70,15 +70,14 @@ impl Default for State {
 
 impl State {
     pub fn new() -> Result<Self, ConfigError> {
-        let mut s = Config::new();
-
         let state_path = std::env::var("BOT_STATE").unwrap_or_else(|_| FILENAME.to_string());
 
-        // Start off by merging in the "default" configuration file
-        s.merge(File::with_name(&state_path))?;
+        let s = Config::builder()
+            .add_source(File::with_name(&state_path))
+            .build()?;
 
         // Deserialize entire configuration
-        s.try_into()
+        s.try_deserialize()
     }
 
     pub fn admins(&self) -> HashSet<UserId> {

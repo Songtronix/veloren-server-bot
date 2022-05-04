@@ -46,7 +46,6 @@ pub async fn run(settings: Settings, server: Server) -> Result<()> {
                 subcommands: vec![owner::add(), owner::remove(), owner::list()],
                 ..owner::admin()
             },
-            owner::admin(),
             owner::register(),
             admin::rev(),
             admin::logs(),
