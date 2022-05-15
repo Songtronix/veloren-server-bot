@@ -21,6 +21,6 @@ serde_yaml = "0.8.23"
 # Error handling
 anyhow = "1.0.57"
 # Discord
-poise = "0.1.0"
+poise = "0.2.1"
 # Other
 linked_hash_set = { version = "0.1.4", features = ["serde"] }

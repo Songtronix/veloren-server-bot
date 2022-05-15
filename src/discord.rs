@@ -14,7 +14,7 @@ pub struct Data {
 async fn event_listener(
     ctx: &serenity::Context,
     event: &poise::Event<'_>,
-    _framework: &poise::Framework<Data, Error>,
+    _framework: poise::FrameworkContext<'_, Data, Error>,
     user_data: &Data,
 ) -> Result<(), Error> {
     match event {
@@ -42,10 +42,7 @@ pub async fn run(settings: Settings, server: Server) -> Result<()> {
             info::status(),
             help::help(),
             owner::quit(),
-            poise::Command {
-                subcommands: vec![owner::add(), owner::remove(), owner::list()],
-                ..owner::admin()
-            },
+            owner::admin(),
             owner::register(),
             admin::rev(),
             admin::logs(),
@@ -54,41 +51,10 @@ pub async fn run(settings: Settings, server: Server) -> Result<()> {
             admin::prune(),
             admin::restart(),
             admin::exec::exec(),
-            poise::Command {
-                subcommands: vec![
-                    admin::args::add(),
-                    admin::args::remove(),
-                    admin::args::list(),
-                    admin::args::reset(),
-                ],
-                ..admin::args::args()
-            },
-            poise::Command {
-                subcommands: vec![
-                    admin::cargo::add(),
-                    admin::cargo::remove(),
-                    admin::cargo::list(),
-                    admin::cargo::reset(),
-                ],
-                ..admin::cargo::cargo()
-            },
-            poise::Command {
-                subcommands: vec![
-                    admin::envs::set(),
-                    admin::envs::remove(),
-                    admin::envs::list(),
-                    admin::envs::reset(),
-                ],
-                ..admin::envs::envs()
-            },
-            poise::Command {
-                subcommands: vec![
-                    admin::files::view(),
-                    admin::files::upload(),
-                    admin::files::remove(),
-                ],
-                ..admin::files::files()
-            },
+            admin::args::args(),
+            admin::cargo::cargo(),
+            admin::envs::envs(),
+            admin::files::files(),
         ],
         listener: |ctx, event, framework, user_data| {
             Box::pin(event_listener(ctx, event, framework, user_data))

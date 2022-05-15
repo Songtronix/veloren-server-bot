@@ -46,7 +46,11 @@ impl File {
 }
 
 /// Manage Veloren server files.
-#[poise::command(slash_command, check = "crate::checks::is_admin")]
+#[poise::command(
+    slash_command,
+    check = "crate::checks::is_admin",
+    subcommands("upload", "remove", "view")
+)]
 pub async fn files(_ctx: Context<'_>) -> Result<(), Error> {
     // Discord doesn't allow root commands to be invoked. Only Subcommands.
     Ok(())
@@ -141,16 +145,11 @@ pub async fn view(
                 .build(),
         )
         .await?;
-    } else {
-        ctx.send(|m| m.content("Uploading file...").ephemeral(true))
-            .await?;
-
-        if let Err(e) = ctx
-            .send(|m| m.attachment(AttachmentType::Path(&path)).ephemeral(true))
-            .await
-        {
-            ctx.say(format!("Failed to send file: {}", e)).await?;
-        }
+    } else if let Err(e) = ctx
+        .send(|m| m.attachment(AttachmentType::Path(&path)).ephemeral(true))
+        .await
+    {
+        ctx.say(format!("Failed to send file: {}", e)).await?;
     }
 
     Ok(())

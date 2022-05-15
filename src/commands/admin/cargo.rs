@@ -3,7 +3,11 @@ use crate::discord::Error;
 use poise::serenity_prelude::MessageBuilder;
 
 /// Manage arguments passed to cargo.
-#[poise::command(slash_command, check = "crate::checks::is_admin")]
+#[poise::command(
+    slash_command,
+    check = "crate::checks::is_admin",
+    subcommands("add", "remove", "list", "reset")
+)]
 pub async fn cargo(_ctx: Context<'_>) -> Result<(), Error> {
     // Discord doesn't allow root commands to be invoked. Only Subcommands.
     Ok(())
@@ -39,17 +43,6 @@ pub async fn remove(
     Ok(())
 }
 
-/// Reset arguments passed to cargo to default.
-#[poise::command(slash_command, check = "crate::checks::is_admin")]
-pub async fn reset(ctx: Context<'_>) -> Result<(), Error> {
-    let mut state = ctx.data().state.lock().await;
-
-    state.clear_cargo_args().await?;
-    ctx.say("Reset all cargo arguments to default.").await?;
-
-    Ok(())
-}
-
 /// List arguments passed to cargo.
 #[poise::command(slash_command, check = "crate::checks::is_admin")]
 pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
@@ -64,6 +57,17 @@ pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
         response.push_italic_line("No cargo arguments set.");
     }
     ctx.say(response.build()).await?;
+
+    Ok(())
+}
+
+/// Reset arguments passed to cargo to default.
+#[poise::command(slash_command, check = "crate::checks::is_admin")]
+pub async fn reset(ctx: Context<'_>) -> Result<(), Error> {
+    let mut state = ctx.data().state.lock().await;
+
+    state.clear_cargo_args().await?;
+    ctx.say("Reset all cargo arguments to default.").await?;
 
     Ok(())
 }

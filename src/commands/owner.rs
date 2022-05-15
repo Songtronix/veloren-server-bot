@@ -23,7 +23,11 @@ pub async fn quit(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 /// Manage admins which are able to modify the server.
-#[poise::command(slash_command, check = "crate::checks::is_owner")]
+#[poise::command(
+    slash_command,
+    check = "crate::checks::is_owner",
+    subcommands("add", "remove", "list")
+)]
 pub async fn admin(_ctx: Context<'_>) -> Result<(), Error> {
     // Discord doesn't allow root commands to be invoked. Only Subcommands.
     Ok(())
@@ -78,19 +82,12 @@ pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-// TODO: Autoregister commands
-
 /// Register application commands in this guild or globally
 ///
 /// Run with no arguments to register in guild, run with argument "global" to register globally.
 #[poise::command(prefix_command, hide_in_help, check = "crate::checks::is_owner")]
-pub async fn register(
-    ctx: Context<'_>,
-    #[description = "Global or Guild"]
-    #[flag]
-    global: bool,
-) -> Result<(), Error> {
-    poise::builtins::register_application_commands(ctx, global).await?;
+pub async fn register(ctx: Context<'_>) -> Result<(), Error> {
+    poise::builtins::register_application_commands_buttons(ctx).await?;
 
     Ok(())
 }

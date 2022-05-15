@@ -3,7 +3,11 @@ use crate::discord::Error;
 use poise::serenity_prelude::MessageBuilder;
 
 /// Manage environment variables passed to the gameserver.
-#[poise::command(slash_command, check = "crate::checks::is_admin")]
+#[poise::command(
+    slash_command,
+    check = "crate::checks::is_admin",
+    subcommands("set", "remove", "list", "reset")
+)]
 pub async fn envs(_ctx: Context<'_>) -> Result<(), Error> {
     // Discord doesn't allow root commands to be invoked. Only Subcommands.
     Ok(())
