@@ -46,25 +46,24 @@ pub async fn rev(
 }
 
 /// Sends you the details to aquire the logs.
-#[poise::command(slash_command, check = "crate::checks::is_admin")]
+#[poise::command(slash_command, ephemeral, check = "crate::checks::is_admin")]
 pub async fn logs(ctx: Context<'_>) -> Result<(), Error> {
     let settings = ctx.data().settings.lock().await;
 
-    ctx.author()
-        .dm(&ctx.discord().http, |m| {
-            m.content(
-                MessageBuilder::new()
-                    .push_bold_line("Keep these credentials secure!")
-                    .push("Username: ")
-                    .push_mono_line(&settings.web_username)
-                    .push("Password: ")
-                    .push_mono_line(&settings.web_password)
-                    .push("Url: ")
-                    .push_line(&settings.web_address)
-                    .build(),
-            )
-        })
-        .await?;
+    ctx.send(|m| {
+        m.content(
+            MessageBuilder::new()
+                .push_bold_line("Keep these credentials secure!")
+                .push("Username: ")
+                .push_mono_line(&settings.web_username)
+                .push("Password: ")
+                .push_mono_line(&settings.web_password)
+                .push("Url: ")
+                .push_line(&settings.web_address)
+                .build(),
+        )
+    })
+    .await?;
 
     Ok(())
 }

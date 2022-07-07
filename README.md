@@ -13,10 +13,11 @@ Discord bot to control a git based veloren server.
 5. Start the bot via `docker-compose up` and let it create the settings.
 6. Adjust all values in `settings.yaml` as desired.
 7. Start again.
-8. Bot is ready. If you want to have live logs follow the next steps.
-9. Setup an reverse proxy like caddy/nginx.
-10. Setup password based access (do not leak server logs publically) to the frontail container (forward to 9001).
-11. Logs should now be accessible.
+8. DM the bot with `~register` as the owner of the discord bot and register the slash commands globally.
+9. Bot is ready. If you want to have live logs follow the next steps.
+10. Setup an reverse proxy like caddy/nginx.
+11. Setup password based access (do not leak server logs publically) to the frontail container (forward to 9001).
+12. Logs should now be accessible.
 
 ## Features
 - Git based (deploy branches or commits)

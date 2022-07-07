@@ -16,8 +16,6 @@ mod utils;
 use anyhow::{Context, Result};
 use server::Server;
 use settings::Settings;
-use tokio::process::Command;
-use utils::aquire_output;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -35,26 +33,7 @@ async fn main() -> Result<()> {
         }
     };
 
-    let git_version = aquire_output(Command::new("git").arg("--version"))
-        .await
-        .context("Failed to aquire git version.")?;
-    let git_lfs = aquire_output(Command::new("git").arg("lfs").arg("--version"))
-        .await
-        .context("Failed to aquire git lfs version.")?;
-    let rustup_version = aquire_output(Command::new("rustup").arg("--version"))
-        .await
-        .context("Failed to aquire rustup version.")?;
-    let cargo_version = aquire_output(Command::new("cargo").arg("--version"))
-        .await
-        .context("Failed to aquire cargo version.")?;
-
-    log::info!(
-        "Current environment git_version={}, git_lfs={}, rustup_version={}, cargo_version={}",
-        git_version,
-        git_lfs,
-        rustup_version,
-        cargo_version,
-    );
+    utils::log_environment().await?;
 
     let server = Server::new(&settings.repository)
         .await

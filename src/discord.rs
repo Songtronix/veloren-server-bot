@@ -84,18 +84,17 @@ pub async fn run(settings: Settings, server: Server) -> Result<()> {
 
     poise::Framework::build()
         .token(&settings.token)
-        .user_data_setup(move |_ctx, _ready, _framework| Box::pin(async move {
-            Ok(
-                Data { settings: Mutex::new(settings),
+        .user_data_setup(move |_ctx, _ready, _framework| {
+            Box::pin(async move {
+                Ok(Data {
+                    settings: Mutex::new(settings),
                     state: Mutex::new(state),
-                    server: Mutex::new(server)
-                }
-            )
-        }))
+                    server: Mutex::new(server),
+                })
+            })
+        })
         .options(options)
-        .intents(
-            serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT, /* TODO: Remove MESSAGE_CONTENT INTENT  */
-        )
+        .intents(serenity::GatewayIntents::non_privileged())
         .run()
         .await
         .unwrap();

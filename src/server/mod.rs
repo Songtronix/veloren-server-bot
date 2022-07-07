@@ -260,7 +260,7 @@ impl Server {
 
         let mut cmd = Command::new("cargo");
         cmd.current_dir(PathBuf::from("veloren"));
-        cmd.arg("+nightly");
+        cmd.env_remove("RUSTUP_TOOLCHAIN"); // Clean up env vars during development.
         cmd.arg("build");
         cmd.args(&["--bin", "veloren-server-cli"]);
         cmd.args(cargo_args);
@@ -288,7 +288,7 @@ impl Server {
 
         let mut cmd = Command::new("cargo");
         cmd.current_dir(PathBuf::from("veloren"));
-        cmd.arg("+nightly");
+        cmd.env_remove("RUSTUP_TOOLCHAIN"); // Clean up env vars during development.
         cmd.arg("run");
         cmd.args(&["--bin", "veloren-server-cli"]);
         cmd.args(cargo_args);

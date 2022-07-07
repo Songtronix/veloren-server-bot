@@ -22,19 +22,17 @@ struct EnvVar {
 /// Set an evironment variable.
 #[poise::command(slash_command, check = "crate::checks::is_admin")]
 pub async fn set(
-    ctx: poise::ApplicationContext<'_, crate::discord::Data, crate::discord::Error>,
+    ctx: Context<'_>,
+    #[description = "Environment Variable name"] name: String,
+    #[description = "Environment Variable value"] value: String,
 ) -> Result<(), Error> {
-    let env = <EnvVar as poise::Modal>::execute(ctx).await?;
+    let mut state = ctx.data().state.lock().await;
+    state.add_env(&name, &value).await?;
 
-    let mut state = ctx.data.state.lock().await;
-    state.add_env(&env.name, &env.value).await?;
-
-    poise::send_application_reply(ctx, |m| {
-        m.content(format!(
-            "Set `{}`=`{}` as environment variable.",
-            env.name, env.value
-        ))
-    })
+    ctx.say(format!(
+        "Set `{}`=`{}` as environment variable.",
+        name, value
+    ))
     .await?;
 
     Ok(())

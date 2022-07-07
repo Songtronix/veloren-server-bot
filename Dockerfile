@@ -26,7 +26,7 @@ RUN cargo build --release
 
 # Veloren Server Bot Runtime Environment.
 # Requires git, git-lfs, rustup and whatever Veloren gameserver depends on.
-FROM ubuntu:18.04 as runtime
+FROM ubuntu:20.04 as runtime
 
 RUN apt-get update
 RUN export DEBIAN_FRONTEND=noninteractive
@@ -38,10 +38,11 @@ RUN apt-get install -y --no-install-recommends --assume-yes \
         git-lfs
 
 RUN git lfs install
+RUN git config --global advice.detachedHead false
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile=minimal; \
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly --profile=minimal; \
         . /root/.cargo/env; \
-        rustup default stable;
+        rustup default nightly;
 
 COPY --from=builder /app/target/release/veloren_server_bot .
 
