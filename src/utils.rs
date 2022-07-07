@@ -76,3 +76,28 @@ async fn print_progress(name: String, stdout: ChildStdout, stderr: ChildStderr) 
     }
     Ok(())
 }
+
+pub async fn log_environment() -> Result<()> {
+    let git_version = aquire_output(Command::new("git").arg("--version"))
+        .await
+        .context("Failed to aquire git version.")?;
+    let git_lfs = aquire_output(Command::new("git").arg("lfs").arg("--version"))
+        .await
+        .context("Failed to aquire git lfs version.")?;
+    let rustup_version = aquire_output(Command::new("rustup").arg("--version"))
+        .await
+        .context("Failed to aquire rustup version.")?;
+    let cargo_version = aquire_output(Command::new("cargo").arg("--version"))
+        .await
+        .context("Failed to aquire cargo version.")?;
+
+    log::info!(
+        "Current environment git_version={}, git_lfs={}, rustup_version={}, cargo_version={}",
+        git_version,
+        git_lfs,
+        rustup_version,
+        cargo_version,
+    );
+
+    Ok(())
+}

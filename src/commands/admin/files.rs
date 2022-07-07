@@ -1,199 +1,156 @@
-use anyhow::Context as anyhowContext;
-use serenity::prelude::*;
-use serenity::{framework::standard::Args, model::prelude::*};
-use serenity::{
-    framework::standard::{macros::command, CommandResult},
-    utils::MessageBuilder,
-};
-use std::collections::HashMap;
-use std::{ffi::OsString, path::PathBuf, str::FromStr};
+use crate::discord::Context;
+use crate::discord::Error;
+use anyhow::Context as AnyhowContext;
+use poise::serenity_prelude::Attachment;
+use poise::serenity_prelude::AttachmentType;
+use poise::serenity_prelude::MessageBuilder;
+use std::path::PathBuf;
 use tokio::io::AsyncWriteExt;
 
-use crate::{server::Server, state::State};
-
-lazy_static::lazy_static! {
-    /// All files allowed to be viewed, updated, deleted.
-    static ref FILES: HashMap<&'static str, PathBuf> = vec![
-        ("db" ,PathBuf::from("veloren/userdata/server/saves/db.sqlite")),
-        ("admins", PathBuf::from("veloren/userdata/server/server_config/admins.ron")),
-        ("banlist", PathBuf::from("veloren/userdata/server/server_config/banlist.ron")),
-        ("description", PathBuf::from("veloren/userdata/server/server_config/description.ron")),
-        ("settings", PathBuf::from("veloren/userdata/server/server_config/settings.ron")),
-        ("whitelist", PathBuf::from("veloren/userdata/server/server_config/whitelist.ron")),
-        ("cli_settings", PathBuf::from("veloren/userdata/server-cli/settings.ron")),
-    ].into_iter().collect();
+#[derive(Debug, poise::ChoiceParameter)]
+pub enum File {
+    Db,
+    Admins,
+    Banlist,
+    Description,
+    Settings,
+    Whitelist,
+    CliSettings,
 }
 
-#[derive(Debug)]
-pub enum Operation {
-    Upload,
-    Remove,
-    View,
-    List,
-}
-
-impl FromStr for Operation {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "upload" | "up" => Ok(Operation::Upload),
-            "remove" | "rm" => Ok(Operation::Remove),
-            "view" | "v" => Ok(Operation::View),
-            "list" | "ls" => Ok(Operation::List),
-            _ => Err("Unknown Operation"),
+// TODO: Do not hardcode files & their path.
+impl File {
+    pub fn path(&self) -> PathBuf {
+        match self {
+            File::Db => PathBuf::from("veloren/target/debug/userdata/server/saves/db.sqlite"),
+            File::Admins => {
+                PathBuf::from("veloren/target/debug/userdata/server/server_config/admins.ron")
+            }
+            File::Banlist => {
+                PathBuf::from("veloren/target/debug/userdata/server/server_config/banlist.ron")
+            }
+            File::Description => {
+                PathBuf::from("veloren/target/debug/userdata/server/server_config/description.ron")
+            }
+            File::Settings => {
+                PathBuf::from("veloren/target/debug/userdata/server/server_config/settings.ron")
+            }
+            File::Whitelist => {
+                PathBuf::from("veloren/target/debug/userdata/server/server_config/whitelist.ron")
+            }
+            File::CliSettings => {
+                PathBuf::from("veloren/target/debug/userdata/server-cli/settings.ron")
+            }
         }
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct File<'a>(&'a PathBuf);
-
-impl<'a> FromStr for File<'a> {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match FILES.get(s.to_lowercase().as_str()) {
-            Some(file) => Ok(File(file)),
-            None => Err("Unknown Operation"),
-        }
-    }
+/// Manage Veloren server files.
+#[poise::command(
+    slash_command,
+    check = "crate::checks::is_admin",
+    subcommands("upload", "remove", "view")
+)]
+pub async fn files(_ctx: Context<'_>) -> Result<(), Error> {
+    // Discord doesn't allow root commands to be invoked. Only Subcommands.
+    Ok(())
 }
 
-#[command]
-#[description = r#"Manage Veloren server files.
-Available subcommands:
-`files list/ls` - List files which can be uploaded/removed/viewed.
-`files upload/up <file>` - Uploades the file and restarts the server.
-`files remove/rm <file>` - Removes the file and restarts the server.
-`files view/v <file>` - View the file (will dm you the file incase it's not text)"#]
-async fn files(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    if args.is_empty() {
-        msg.channel_id
-            .say(
-                &ctx.http,
-                "Check `help files` to view all available subcommands.",
-            )
-            .await?;
-        return Ok(());
-    }
-    let operation = args.single::<Operation>()?;
+/// Manage Veloren server files.
+#[poise::command(slash_command, check = "crate::checks::is_admin")]
+pub async fn upload(
+    ctx: Context<'_>,
+    #[description = "which file to upload"] file: File,
+    #[description = "which file to upload"] newfile: Attachment,
+) -> Result<(), Error> {
+    let mut server = ctx.data().server.lock().await;
+    let state = ctx.data().state.lock().await;
 
-    if matches!(operation, Operation::List) {
-        let mut response = MessageBuilder::new();
-        response.push_bold_line("Files:");
-        for file in FILES.keys() {
-            response.push_line_safe(file);
-        }
-        msg.channel_id.say(&ctx.http, response.build()).await?;
-        return Ok(());
-    }
-
-    let file = match args.single::<File>() {
-        Ok(file) => file,
-        Err(_) => {
-            msg.channel_id
-                .say(
-                    &ctx.http,
-                    "Unknown file! Check `files list` for available files.",
-                )
+    // Note: This will download the file straight to RAM.
+    let content = match newfile.download().await {
+        Ok(content) => content,
+        Err(why) => {
+            ctx.say(format!("Error downloading attachment: {}", why))
                 .await?;
             return Ok(());
         }
     };
 
-    let data = ctx.data.read().await;
-    let mut server = data_get!(data, msg, ctx, Server);
-    let state = data_get!(data, msg, ctx, State);
+    server.stop().await;
 
-    match operation {
-        Operation::Upload => {
-            match msg
-                .attachments
-                .iter()
-                .find(|s| OsString::from(&s.filename) == file.0.file_name().unwrap()) // Only files in FILES
-            {
-                Some(attachment) => {
-                    let content = match attachment.download().await {
-                        Ok(content) => content,
-                        Err(why) => {
-                            msg.channel_id
-                                .say(&ctx, format!("Error downloading attachment: {}", why))
-                                .await?;
-                            return Ok(());
-                        }
-                    };
-                    server.stop().await;
+    let mut file = tokio::fs::File::create(file.path())
+        .await
+        .context("Failed to open file for upload.")?;
+    file.write_all(&content)
+        .await
+        .context("Failed to write file for upload.")?;
+    file.sync_all()
+        .await
+        .context("Failed to sync data for upload.")?;
 
-                    let mut file = tokio::fs::File::create(file.0).await.context("Failed to open file for upload.")?;
-                    file.write_all(&content).await.context("Failed to write file for upload.")?;
-                    file.sync_all().await.context("Failed to sync data for upload.")?;
+    server
+        .start(state.rev(), state.args(), state.cargo_args(), state.envs())
+        .await;
 
-                    server.start(state.rev(), state.args(), state.cargo_args(), state.envs()).await;
+    ctx.say("File uploaded and server restarted.").await?;
 
-                    msg.channel_id.say(&ctx, "File uploaded and server restarted.").await?;
-                }
-                None => {
-                    msg.channel_id
-                        .say(
-                            &ctx.http,
-                            "Please attach the file to the message containing the upload command.",
-                        )
-                        .await?;
-                }
-            };
-        }
-        Operation::Remove => {
-            server.stop().await;
-            tokio::fs::remove_file(file.0).await?;
-            server
-                .start(state.rev(), state.args(), state.cargo_args(), state.envs())
-                .await;
+    Ok(())
+}
 
-            msg.channel_id
-                .say(&ctx, "File removed and server restarted.")
-                .await?;
-        }
-        Operation::View => {
-            if file.0.extension().unwrap() == "ron" {
-                let content = match tokio::fs::read_to_string(file.0).await {
-                    Ok(content) => content,
-                    Err(e) => {
-                        msg.channel_id
-                            .say(&ctx, format!("Failed to read file: {}", e))
-                            .await?;
-                        return Ok(());
-                    }
-                };
+/// Manage Veloren server files.
+#[poise::command(slash_command, check = "crate::checks::is_admin")]
+pub async fn remove(
+    ctx: Context<'_>,
+    #[description = "which file to remove"] file: File,
+) -> Result<(), Error> {
+    let mut server = ctx.data().server.lock().await;
+    let state = ctx.data().state.lock().await;
 
-                msg.channel_id
-                    .say(
-                        &ctx.http,
-                        MessageBuilder::new()
-                            .push_codeblock(content, Some("rust"))
-                            .build(),
-                    )
-                    .await?;
-            } else {
-                if let Err(e) = msg
-                    .author
-                    .dm(&ctx.http, |m| m.content("File:").add_file(file.0))
-                    .await
-                {
-                    msg.author
-                        .dm(&ctx.http, |m| {
-                            m.content(format!("Failed to send file: {}", e))
-                        })
-                        .await?;
-                }
+    server.stop().await;
 
-                if !msg.is_private() {
-                    msg.channel_id.say(&ctx.http, "File send via DM.").await?;
-                }
+    if let Err(e) = tokio::fs::remove_file(file.path()).await {
+        ctx.say(format!("Failed to delete file: {}", e)).await?;
+        return Ok(());
+    }
+
+    server
+        .start(state.rev(), state.args(), state.cargo_args(), state.envs())
+        .await;
+
+    ctx.say("File removed and server restarted.").await?;
+
+    Ok(())
+}
+
+/// Manage Veloren server files.
+#[poise::command(slash_command, check = "crate::checks::is_admin")]
+pub async fn view(
+    ctx: Context<'_>,
+    #[description = "which file to view"] file: File,
+) -> Result<(), Error> {
+    let path = file.path();
+
+    if file.path().extension().unwrap() == "ron" {
+        let content = match tokio::fs::read_to_string(file.path()).await {
+            Ok(content) => content,
+            Err(e) => {
+                ctx.say(format!("Failed to read file: {}", e)).await?;
+                return Ok(());
             }
-        }
-        Operation::List => unreachable!(),
-    };
+        };
+
+        ctx.say(
+            MessageBuilder::new()
+                .push_codeblock(content, Some("rust"))
+                .build(),
+        )
+        .await?;
+    } else if let Err(e) = ctx
+        .send(|m| m.attachment(AttachmentType::Path(&path)).ephemeral(true))
+        .await
+    {
+        ctx.say(format!("Failed to send file: {}", e)).await?;
+    }
 
     Ok(())
 }

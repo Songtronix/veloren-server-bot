@@ -1,127 +1,98 @@
-use super::utils;
-use crate::{discord::ShardManagerContainer, state::State};
+use crate::discord::Context;
+use crate::discord::Error;
 use anyhow::Result;
-use serenity::model::prelude::*;
-use serenity::prelude::*;
-use serenity::{
-    framework::standard::{macros::command, Args, CommandResult},
-    utils::MessageBuilder,
-};
-use std::str::FromStr;
+use poise::serenity_prelude::MessageBuilder;
+use poise::serenity_prelude::OnlineStatus;
+use poise::serenity_prelude::User;
 
-#[command]
-#[description = "Shutdown the bot."]
-async fn quit(ctx: &Context, msg: &Message) -> CommandResult {
-    let data = ctx.data.read().await;
-
-    if let Some(manager) = data.get::<ShardManagerContainer>() {
-        msg.channel_id.say(&ctx, "Shutting down!").await?;
-        ctx.set_presence(None, OnlineStatus::Offline).await;
-        manager.lock().await.shutdown_all().await;
-    } else {
-        msg.reply(&ctx, "There was a problem getting the shard manager")
-            .await?;
-        return Ok(());
-    }
+/// Shutdown the bot.
+#[poise::command(slash_command, check = "crate::checks::is_owner")]
+pub async fn quit(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.say("Shutting down!").await?;
+    ctx.discord()
+        .set_presence(None, OnlineStatus::Offline)
+        .await;
+    ctx.framework()
+        .shard_manager()
+        .lock()
+        .await
+        .shutdown_all()
+        .await;
 
     Ok(())
 }
 
-#[derive(Debug)]
-pub enum Operation {
-    Add,
-    Remove,
-    List,
+/// Manage admins which are able to modify the server.
+#[poise::command(
+    slash_command,
+    check = "crate::checks::is_admin",
+    subcommands("add", "remove", "list")
+)]
+pub async fn admin(_ctx: Context<'_>) -> Result<(), Error> {
+    // Discord doesn't allow root commands to be invoked. Only Subcommands.
+    Ok(())
 }
 
-impl FromStr for Operation {
-    type Err = &'static str;
+/// Manage admins which are able to modify the server.
+#[poise::command(slash_command, check = "crate::checks::is_admin")]
+pub async fn add(
+    ctx: Context<'_>,
+    #[description = "User to add to the admin list"] user: User,
+) -> Result<(), Error> {
+    let mut state = ctx.data().state.lock().await;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "add" => Ok(Operation::Add),
-            "remove" | "rm" => Ok(Operation::Remove),
-            "list" | "ls" => Ok(Operation::List),
-            _ => Err("Unknown Operation"),
-        }
-    }
+    state.add_admin(user.id.0).await?;
+    ctx.say(format!("Added '{}' to the admins list.", user.tag()))
+        .await?;
+
+    Ok(())
 }
 
-#[command]
-#[description = r#"Manage admins which are able to modify the server.
-Available subcommands:
-`admin add` - Add an admin.
-`admin remove/rm` - Remove an admin.
-`admin list/ls` - List all admins."#]
-async fn admin(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    if args.is_empty() {
-        msg.channel_id
-            .say(
-                &ctx.http,
-                "Check `help admin` to view all available subcommands.",
-            )
-            .await?;
-        return Ok(());
+/// Manage admins which are able to modify the server.
+#[poise::command(slash_command, check = "crate::checks::is_admin")]
+pub async fn remove(
+    ctx: Context<'_>,
+    #[description = "User to remove from the admin list"] user: User,
+) -> Result<(), Error> {
+    let mut state = ctx.data().state.lock().await;
+
+    state.remove_admin(user.id.0).await?;
+    ctx.say(format!("Removed '{}' from the admins list.", user.tag()))
+        .await?;
+
+    Ok(())
+}
+
+/// Manage admins which are able to modify the server.
+#[poise::command(slash_command, check = "crate::checks::is_admin")]
+pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
+    let state = ctx.data().state.lock().await;
+
+    let mut response = MessageBuilder::new();
+    response.push_bold_line("Admins:");
+    for admin in state.admins() {
+        let admin = admin.to_user(&ctx.discord().http).await?;
+        response.push_line_safe(format!("{} ({})", admin.tag(), admin.id));
     }
-    let operation = args.single::<Operation>()?;
+    if state.admins().is_empty() {
+        response.push_italic_line("No Admins found.");
+    }
+    ctx.say(response.build()).await?;
 
-    let data = ctx.data.read().await;
-    let mut state = data_get!(data, msg, ctx, State);
+    Ok(())
+}
 
-    match operation {
-        Operation::List => {
-            let mut response = MessageBuilder::new();
-            response.push_bold_line("Admins:");
-            for admin in state.admins() {
-                let admin = admin.to_user(&ctx.http).await?;
-                response.push_line_safe(format!("{} ({})", admin.tag(), admin.id));
-            }
-            if state.admins().is_empty() {
-                response.push_italic_line("No Admins found.");
-            }
-            msg.channel_id.say(&ctx.http, response.build()).await?;
-        }
-        Operation::Add => {
-            let identifier = args.single::<String>()?;
-            let whom = match utils::get_member(&ctx, &msg, &identifier).await? {
-                Some(user) => user,
-                None => {
-                    msg.channel_id
-                        .say(&ctx, format!("Couldn't find '{}'", identifier))
-                        .await?;
-                    return Ok(());
-                }
-            };
-
-            state.add_admin(whom.id.0).await?;
-            msg.channel_id
-                .say(
-                    &ctx.http,
-                    format!("Added '{}' to the admins list.", whom.tag()),
-                )
-                .await?;
-        }
-        Operation::Remove => {
-            let identifier = args.single::<String>()?;
-            let whom = match utils::get_member(&ctx, &msg, &identifier).await? {
-                Some(user) => user,
-                None => {
-                    msg.channel_id
-                        .say(&ctx, format!("Couldn't find '{}'", identifier))
-                        .await?;
-                    return Ok(());
-                }
-            };
-
-            state.remove_admin(whom.id.0).await?;
-            msg.channel_id
-                .say(
-                    &ctx.http,
-                    format!("Removed '{}' from the admins list.", whom.tag()),
-                )
-                .await?;
-        }
-    };
+/// Register application commands in this guild or globally
+///
+/// Run with no arguments to register in guild, run with argument "global" to register globally.
+#[poise::command(
+    prefix_command,
+    dm_only,
+    hide_in_help,
+    check = "crate::checks::is_owner"
+)]
+pub async fn register(ctx: Context<'_>) -> Result<(), Error> {
+    poise::builtins::register_application_commands_buttons(ctx).await?;
 
     Ok(())
 }

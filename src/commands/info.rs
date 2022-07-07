@@ -1,126 +1,72 @@
-use crate::{
-    server::{Server, ServerStatus},
-    settings::Settings,
-    state::{Rev, State},
-};
+use crate::discord::Context;
+use crate::discord::Error;
+use crate::{server::ServerStatus, state::Rev};
 use linked_hash_set::LinkedHashSet;
-use serenity::{builder::CreateEmbed, prelude::*};
-use serenity::{framework::standard::Args, model::prelude::*};
-use serenity::{
-    framework::standard::{macros::command, CommandResult},
-    utils::MessageBuilder,
-};
+use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::CreateEmbed;
+use poise::serenity_prelude::MessageBuilder;
+use poise::serenity_prelude::UserId;
 use std::collections::HashMap;
-use std::str::FromStr;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[command]
-#[description = "Explains what this bot is about."]
-async fn about(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.channel_id
-        .send_message(&ctx.http, |m| {
-            m.embed(|e| {
-                e.title(format!("Veloren Server Bot v{}", VERSION));
-                e.description(
-                    MessageBuilder::new()
-                        .push("written by ")
-                        .mention(&UserId(137581264247980033))
-                        .build(),
-                );
-                e.field(
-                    "Purpose of this bot",
-                    "Provide easy access to the Veloren testing server.",
-                    true,
-                );
-                e.footer(|f| {
-                    f.text(format!(
-                        "Copyright © {} Veloren Team",
-                        chrono::Utc::now().date().format("%Y")
-                    ))
-                });
-                e
+/// Explains what this bot is about.
+#[poise::command(slash_command)]
+pub async fn about(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.send(|m| {
+        m.embed(|e| {
+            e.title(format!("Veloren Server Bot v{}", VERSION));
+            e.description(
+                serenity::MessageBuilder::new()
+                    .push("written by ")
+                    .mention(&UserId(137581264247980033))
+                    .build(),
+            );
+            e.field(
+                "Purpose of this bot",
+                "Provide easy access to the Veloren testing server.",
+                true,
+            );
+            e.footer(|f| {
+                f.text(format!(
+                    "Copyright © {} Veloren Team",
+                    chrono::Utc::now().date().format("%Y")
+                ))
             });
-            m
-        })
-        .await?;
+            e
+        });
+        m
+    })
+    .await?;
+
     Ok(())
 }
 
-#[derive(Debug)]
-pub enum StatusOperation {
-    Verbose,
-    Normal,
-}
-
-impl FromStr for StatusOperation {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "verbose" | "v" => Ok(StatusOperation::Verbose),
-            _ => Err("Unknown Operation"),
-        }
-    }
-}
-
-#[command]
-#[description = r#"Prints current status of the Veloren Server.
-Available subcommands:
-`status verbose` - Detailed status."#]
-async fn status(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    let data = ctx.data.read().await;
-
-    let mut server = data_get!(data, msg, ctx, Server);
-    let settings = data_get!(data, msg, ctx, Settings);
-    let state = data_get!(data, msg, ctx, State);
+/// Prints current status of the Veloren Server.
+#[poise::command(slash_command)]
+pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
+    let mut server = ctx.data().server.lock().await;
+    let settings = ctx.data().settings.lock().await;
+    let state = ctx.data().state.lock().await;
 
     let status = server.status().await;
 
-    let operation = args
-        .single::<StatusOperation>()
-        .unwrap_or(StatusOperation::Normal);
-
-    match operation {
-        StatusOperation::Normal => {
-            msg.channel_id
-                .send_message(&ctx.http, |m| {
-                    m.embed(|e| {
-                        create_status_msg(
-                            e,
-                            &status,
-                            server.version(),
-                            state.rev(),
-                            &settings.gameserver_address,
-                            None,
-                            None,
-                            None,
-                        )
-                    });
-                    m
-                })
-                .await?;
-        }
-        StatusOperation::Verbose => {
-            msg.channel_id
-                .send_message(&ctx.http, |m| {
-                    m.embed(|e| {
-                        create_status_msg(
-                            e,
-                            &status,
-                            server.version(),
-                            state.rev(),
-                            &settings.gameserver_address,
-                            Some(state.envs().clone()),
-                            Some(state.args().clone()),
-                            Some(state.cargo_args().clone()),
-                        )
-                    });
-                    m
-                })
-                .await?;
-        }
-    }
+    ctx.send(|m| {
+        m.embed(|e| {
+            create_status_msg(
+                e,
+                &status,
+                server.version(),
+                state.rev(),
+                &settings.gameserver_address,
+                Some(state.envs().clone()),
+                Some(state.args().clone()),
+                Some(state.cargo_args().clone()),
+            )
+        });
+        m
+    })
+    .await?;
 
     Ok(())
 }
@@ -224,12 +170,6 @@ fn create_status_msg<'b>(
             .build(),
         false,
     );
-    e.footer(|f| {
-        f.text(format!(
-            "Copyright © {} Veloren Team",
-            chrono::Utc::now().date().format("%Y")
-        ))
-    });
 
     e
 }

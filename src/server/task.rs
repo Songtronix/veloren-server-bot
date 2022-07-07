@@ -6,7 +6,6 @@ use tokio::task::JoinHandle;
 /// Piece of work which can be cancelled
 #[derive(Debug)]
 pub struct Task {
-    done: Arc<AtomicBool>,
     shutdown: AbortHandle,
     handle: JoinHandle<Result<()>>,
 }
@@ -19,7 +18,7 @@ impl Task {
     {
         let (shutdown, abort_registration) = AbortHandle::new_pair();
         let done = Arc::new(AtomicBool::new(false));
-        let done2 = done.clone();
+        let done2 = done;
         let future = Abortable::new(task, abort_registration);
         let handle = tokio::task::spawn(async move {
             future.await?;
@@ -27,16 +26,7 @@ impl Task {
             Ok(())
         });
 
-        Self {
-            done,
-            shutdown,
-            handle,
-        }
-    }
-
-    /// Checks whether the task has completed
-    pub async fn _has_finished(&self) -> bool {
-        self.done.load(Ordering::Relaxed)
+        Self { shutdown, handle }
     }
 
     /// Joins the task and returns the result.

@@ -1,14 +1,11 @@
 mod task;
+
 use crate::{state::Rev, utils};
-
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
-
 use anyhow::{Context, Result};
 use futures::FutureExt;
 use linked_hash_set::LinkedHashSet;
-use serenity::prelude::TypeMapKey;
+use std::{collections::HashMap, path::PathBuf};
 use task::Task;
-use tokio::sync::Mutex;
 use tokio::{process::Command, sync::mpsc};
 
 #[derive(Debug)]
@@ -47,10 +44,6 @@ impl std::fmt::Display for ServerStatus {
             }
         }
     }
-}
-
-impl TypeMapKey for Server {
-    type Value = Arc<Mutex<Server>>;
 }
 
 impl Server {
@@ -142,7 +135,7 @@ impl Server {
         }
 
         // Start
-        self.run(&rev, &args, &cargo_args, &envs).await;
+        self.run(rev, args, cargo_args, envs).await;
         true
     }
 
@@ -211,7 +204,7 @@ impl Server {
                 reset.args(&["reset", "--hard", &format!("origin/{}", branch)]);
             }
             Rev::Commit(commit) => {
-                reset.args(&["reset", "--hard", &commit]);
+                reset.args(&["reset", "--hard", commit]);
             }
         }
 
@@ -267,6 +260,7 @@ impl Server {
 
         let mut cmd = Command::new("cargo");
         cmd.current_dir(PathBuf::from("veloren"));
+        cmd.env_remove("RUSTUP_TOOLCHAIN"); // Clean up env vars during development.
         cmd.arg("build");
         cmd.args(&["--bin", "veloren-server-cli"]);
         cmd.args(cargo_args);
@@ -294,6 +288,7 @@ impl Server {
 
         let mut cmd = Command::new("cargo");
         cmd.current_dir(PathBuf::from("veloren"));
+        cmd.env_remove("RUSTUP_TOOLCHAIN"); // Clean up env vars during development.
         cmd.arg("run");
         cmd.args(&["--bin", "veloren-server-cli"]);
         cmd.args(cargo_args);
