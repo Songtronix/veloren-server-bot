@@ -7,8 +7,8 @@ publish = false
 
 [dependencies]
 # Async
-tokio = { version = "1.18.1", features = ["macros", "process", "rt-multi-thread", "sync"] }
-tokio-stream = { version = "0.1.8", features = ["io-util"] }
+tokio = { version = "1.19.2", features = ["macros", "process", "rt-multi-thread", "sync"] }
+tokio-stream = { version = "0.1.9", features = ["io-util"] }
 futures = "0.3.21"
 # Logging
 fern = { version = "0.6.1", features = ["colored"] }
@@ -17,10 +17,10 @@ log = "0.4.17"
 # Config
 config = { version = "0.13.1", features = ["yaml"] }
 serde = { version = "1.0.137", features = ["derive"] }
-serde_yaml = "0.8.23"
+serde_yaml = "0.8.24"
 # Error handling
-anyhow = "1.0.57"
+anyhow = "1.0.58"
 # Discord
-poise = "0.2.1"
+poise = "0.2.2"
 # Other
 linked_hash_set = { version = "0.1.4", features = ["serde"] }
