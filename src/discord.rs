@@ -1,5 +1,5 @@
 use crate::{commands::*, server::Server, settings::Settings, state::State, Result};
-use poise::serenity_prelude::{self as serenity, Activity, OnlineStatus};
+use poise::serenity_prelude::{self as serenity, ActivityData, CacheHttp, OnlineStatus};
 use tokio::sync::Mutex;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -11,22 +11,23 @@ pub struct Data {
     pub server: Mutex<Server>,
 }
 
-async fn event_listener(
+async fn event_handler(
     ctx: &serenity::Context,
-    event: &poise::Event<'_>,
-    _framework: poise::FrameworkContext<'_, Data, Error>,
-    user_data: &Data,
+    event: &serenity::FullEvent,
+    framework: poise::FrameworkContext<'_, Data, Error>,
+    data: &Data,
 ) -> Result<(), Error> {
     match event {
-        poise::Event::Ready { data_about_bot } => {
+        serenity::FullEvent::Ready { data_about_bot } => {
+            poise::builtins::register_globally(ctx.http(), &framework.options().commands).await?;
+
             log::info!("Connected as {}", data_about_bot.user.name);
-            ctx.set_presence(None, OnlineStatus::Online).await;
-            ctx.set_activity(Activity::playing(
-                user_data.settings.lock().await.gameserver_address.clone(),
-            ))
-            .await;
+            ctx.set_presence(None, OnlineStatus::Online);
+            ctx.set_activity(Some(ActivityData::playing(
+                data.settings.lock().await.gameserver_address.clone(),
+            )));
         }
-        poise::Event::Resume { event: _ } => {
+        serenity::FullEvent::Resume { event: _ } => {
             log::info!("Connection to discord resumed.");
         }
         _ => {}
@@ -36,6 +37,8 @@ async fn event_listener(
 }
 
 pub async fn run(settings: Settings, server: Server) -> Result<()> {
+    let token = settings.token.clone();
+
     let options = poise::FrameworkOptions {
         commands: vec![
             info::about(),
@@ -43,7 +46,6 @@ pub async fn run(settings: Settings, server: Server) -> Result<()> {
             help::help(),
             owner::quit(),
             owner::admin(),
-            owner::register(),
             admin::rev(),
             admin::logs(),
             admin::start(),
@@ -56,20 +58,11 @@ pub async fn run(settings: Settings, server: Server) -> Result<()> {
             admin::envs::envs(),
             admin::files::files(),
         ],
-        listener: |ctx, event, framework, user_data| {
-            Box::pin(event_listener(ctx, event, framework, user_data))
+        event_handler: |ctx, event, framework, user_data| {
+            Box::pin(event_handler(ctx, event, framework, user_data))
         },
         on_error: |error| Box::pin(on_error(error)),
         pre_command: |ctx| Box::pin(pre_command(ctx)),
-        prefix_options: poise::PrefixFrameworkOptions {
-            prefix: Some(String::from("~")),
-            mention_as_prefix: false,
-            edit_tracker: Some(poise::EditTracker::for_timespan(
-                std::time::Duration::from_secs(3600 * 3),
-            )),
-            ..Default::default()
-        },
-
         ..Default::default()
     };
 
@@ -82,9 +75,8 @@ pub async fn run(settings: Settings, server: Server) -> Result<()> {
         }
     };
 
-    poise::Framework::build()
-        .token(&settings.token)
-        .user_data_setup(move |_ctx, _ready, _framework| {
+    let framework = poise::Framework::builder()
+        .setup(move |_ctx, _ready, _framework| {
             Box::pin(async move {
                 Ok(Data {
                     settings: Mutex::new(settings),
@@ -94,10 +86,13 @@ pub async fn run(settings: Settings, server: Server) -> Result<()> {
             })
         })
         .options(options)
-        .intents(serenity::GatewayIntents::non_privileged())
-        .run()
-        .await
-        .unwrap();
+        .build();
+
+    serenity::Client::builder(&token, serenity::GatewayIntents::non_privileged())
+        .framework(framework)
+        .await?
+        .start()
+        .await?;
 
     Ok(())
 }
@@ -107,8 +102,8 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     // They are many errors that can occur, so we only handle the ones we want to customize
     // and forward the rest to the default handler
     match error {
-        poise::FrameworkError::Setup { error } => panic!("Failed to start bot: {:?}", error),
-        poise::FrameworkError::Command { error, ctx } => {
+        poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {:?}", error),
+        poise::FrameworkError::Command { error, ctx, .. } => {
             log::error!("Error in command `{}`: {:?}", ctx.command().name, error,);
         }
         error => {

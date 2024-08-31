@@ -1,4 +1,5 @@
 use poise::serenity_prelude::MessageBuilder;
+use poise::CreateReply;
 
 use crate::discord::Context;
 use crate::discord::Error;
@@ -24,12 +25,13 @@ pub async fn rev(
     match state.set_rev(&rev, &settings.repository).await? {
         true => {
             edit_msg
-                .edit(ctx, |m| {
-                    m.content(format!(
+                .edit(
+                    ctx,
+                    CreateReply::default().content(format!(
                         "Changed to `{}`. Check with `status` for servers' progress.",
                         &rev
-                    ))
-                })
+                    )),
+                )
                 .await?;
             server
                 .restart(state.rev(), state.args(), state.cargo_args(), state.envs())
@@ -37,7 +39,10 @@ pub async fn rev(
         }
         false => {
             edit_msg
-                .edit(ctx, |m| m.content(format!("`{}` does not exist!", &rev)))
+                .edit(
+                    ctx,
+                    CreateReply::default().content(format!("`{}` does not exist!", &rev)),
+                )
                 .await?;
         }
     };
@@ -50,19 +55,19 @@ pub async fn rev(
 pub async fn logs(ctx: Context<'_>) -> Result<(), Error> {
     let settings = ctx.data().settings.lock().await;
 
-    ctx.send(|m| {
-        m.content(
+    ctx.send(
+        CreateReply::default().content(
             MessageBuilder::new()
                 .push_bold_line("Keep these credentials secure!")
                 .push("Username: ")
-                .push_mono_line(&settings.web_username)
+                .push_spoiler_line_safe(&settings.web_username)
                 .push("Password: ")
-                .push_mono_line(&settings.web_password)
+                .push_spoiler_line_safe(&settings.web_password)
                 .push("Url: ")
-                .push_line(&settings.web_address)
+                .push_line_safe(&settings.web_address)
                 .build(),
-        )
-    })
+        ),
+    )
     .await?;
 
     Ok(())

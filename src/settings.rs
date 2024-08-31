@@ -33,7 +33,7 @@ impl Default for Settings {
         Self {
             token: String::from("DISCORD_BOT_TOKEN_HERE"),
             owner: 999999999,
-            repository: String::from("https://gitlab.com/veloren/veloren.git"),
+            repository: String::from("https://gitlab.com/veloren/dev/veloren.git"),
             prefix: String::from("~"),
             web_address: String::from("WEB_LOGS_WEBSITE_HERE"),
             web_username: String::from("WEB_LOGS_USERNAME_HERE"),
