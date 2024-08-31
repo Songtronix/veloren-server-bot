@@ -81,7 +81,7 @@ impl State {
     }
 
     pub fn admins(&self) -> HashSet<UserId> {
-        self.admins.iter().map(|s| UserId(*s)).collect()
+        self.admins.iter().map(|s| UserId::new(*s)).collect()
     }
 
     /// Returns the git head
@@ -107,7 +107,7 @@ impl State {
     pub async fn set_rev<T: ToString, Y: ToString>(&mut self, rev: T, repo: Y) -> Result<bool> {
         let mut branch_cmd = Command::new("git");
         branch_cmd.current_dir(PathBuf::from("veloren"));
-        branch_cmd.args(&[
+        branch_cmd.args([
             "ls-remote",
             "--exit-code",
             "--heads",
@@ -129,7 +129,7 @@ impl State {
         } else {
             let mut fetch_cmd = Command::new("git");
             fetch_cmd.current_dir(PathBuf::from("veloren"));
-            fetch_cmd.args(&["fetch", "--all"]);
+            fetch_cmd.args(["fetch", "--all"]);
 
             fetch_cmd
                 .stdout(Stdio::null())
@@ -140,7 +140,7 @@ impl State {
 
             let mut commit_cmd = Command::new("git");
             commit_cmd.current_dir(PathBuf::from("veloren"));
-            commit_cmd.args(&["cat-file", "-e", &rev.to_string()]);
+            commit_cmd.args(["cat-file", "-e", &rev.to_string()]);
 
             let commit_exists = commit_cmd
                 .stdout(Stdio::null())

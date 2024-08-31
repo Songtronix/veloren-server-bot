@@ -1,32 +1,29 @@
 # Credit goes to https://www.lpalmieri.com/posts/2020-11-01-zero-to-production-5-how-to-deploy-a-rust-application/#3-8-optimising-our-docker-image
 
+FROM lukemathwalker/cargo-chef:latest-rust-1 AS chef
+WORKDIR /app
+
 # Check for modified dependencies
-FROM lukemathwalker/cargo-chef as planner
-WORKDIR app
+FROM chef AS planner
+WORKDIR /app
 COPY . .
 # Compute a lock-like file for our project
 RUN cargo chef prepare --recipe-path recipe.json
 
 # Cache dependencies
-FROM lukemathwalker/cargo-chef as cacher
-WORKDIR app
+FROM chef AS builder
+WORKDIR /app
 COPY --from=planner /app/recipe.json recipe.json
-# Build our project dependencies, not our application! 
+# Build dependencies - this is the caching Docker layer!
 RUN cargo chef cook --release --recipe-path recipe.json
-
-# Build Bot
-FROM rust AS builder
-WORKDIR app
-# Copy over the cached dependencies
-COPY --from=cacher /app/target target
-COPY --from=cacher /usr/local/cargo /usr/local/cargo
+# Build application
 COPY . .
 # Build our application, leveraging the cached deps!
 RUN cargo build --release
 
 # Veloren Server Bot Runtime Environment.
 # Requires git, git-lfs, rustup and whatever Veloren gameserver depends on.
-FROM ubuntu:20.04 as runtime
+FROM debian:bookworm-slim AS runtime
 
 RUN apt-get update
 RUN export DEBIAN_FRONTEND=noninteractive

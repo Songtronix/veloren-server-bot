@@ -6,6 +6,7 @@ use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::CreateEmbed;
 use poise::serenity_prelude::MessageBuilder;
 use poise::serenity_prelude::UserId;
+use poise::CreateReply;
 use std::collections::HashMap;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -13,30 +14,23 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Explains what this bot is about.
 #[poise::command(slash_command)]
 pub async fn about(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title(format!("Veloren Server Bot v{}", VERSION));
-            e.description(
-                serenity::MessageBuilder::new()
-                    .push("written by ")
-                    .mention(&UserId(137581264247980033))
-                    .build(),
-            );
-            e.field(
-                "Purpose of this bot",
-                "Provide easy access to the Veloren testing server.",
-                true,
-            );
-            e.footer(|f| {
-                f.text(format!(
-                    "Copyright © {} Veloren Team",
-                    chrono::Utc::now().date().format("%Y")
-                ))
-            });
-            e
-        });
-        m
-    })
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title(format!("Veloren Server Bot v{}", VERSION))
+                .description(
+                    serenity::MessageBuilder::new()
+                        .push("written by ")
+                        .mention(&UserId::new(137581264247980033))
+                        .build(),
+                )
+                .field(
+                    "Purpose of this bot",
+                    "Provide easy access to the Veloren testing server.",
+                    true,
+                ),
+        ),
+    )
     .await?;
 
     Ok(())
@@ -51,29 +45,22 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
 
     let status = server.status().await;
 
-    ctx.send(|m| {
-        m.embed(|e| {
-            create_status_msg(
-                e,
-                &status,
-                server.version(),
-                state.rev(),
-                &settings.gameserver_address,
-                Some(state.envs().clone()),
-                Some(state.args().clone()),
-                Some(state.cargo_args().clone()),
-            )
-        });
-        m
-    })
+    ctx.send(CreateReply::default().embed(create_status_msg(
+        &status,
+        server.version(),
+        state.rev(),
+        &settings.gameserver_address,
+        Some(state.envs().clone()),
+        Some(state.args().clone()),
+        Some(state.cargo_args().clone()),
+    )))
     .await?;
 
     Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
-fn create_status_msg<'b>(
-    e: &'b mut CreateEmbed,
+fn create_status_msg(
     status: &ServerStatus,
     version: Option<String>,
     rev: &Rev,
@@ -81,7 +68,9 @@ fn create_status_msg<'b>(
     envs: Option<HashMap<String, String>>,
     args: Option<LinkedHashSet<String>>,
     cargo_args: Option<LinkedHashSet<String>>,
-) -> &'b mut CreateEmbed {
+) -> CreateEmbed {
+    let mut e = CreateEmbed::new();
+
     let envs_msg = match envs {
         Some(env) => {
             let mut envs = MessageBuilder::new();
@@ -123,29 +112,29 @@ fn create_status_msg<'b>(
         None => None,
     };
 
-    e.title(":bar_chart: Veloren Server Status");
-    e.field(
+    e = e.title(":bar_chart: Veloren Server Status").field(
         "Status",
-        MessageBuilder::new().push_mono(status).build(),
+        MessageBuilder::new().push_mono(status.to_string()).build(),
         true,
     );
+
     match rev {
         Rev::Branch(branch) => {
             if let Some(version) = version {
-                e.field(
+                e = e.field(
                     "Commit",
                     MessageBuilder::new().push_mono(version).build(),
                     true,
                 );
             }
-            e.field(
+            e = e.field(
                 "Branch",
                 MessageBuilder::new().push_mono(branch).build(),
                 false,
             );
         }
         Rev::Commit(commit) => {
-            e.field(
+            e = e.field(
                 "Commit",
                 MessageBuilder::new().push_mono(commit).build(),
                 false,
@@ -154,19 +143,19 @@ fn create_status_msg<'b>(
     }
 
     if let Some(envs_msg) = envs_msg {
-        e.field(":label: Environment variables", envs_msg, false);
+        e = e.field(":label: Environment variables", envs_msg, false);
     }
     if let Some(args_msg) = args_msg {
-        e.field(":video_game: Gameserver arguments", args_msg, false);
+        e = e.field(":video_game: Gameserver arguments", args_msg, false);
     }
     if let Some(cargo_args_msg) = cargo_args_msg {
-        e.field(":package: Cargo arguments", cargo_args_msg, false);
+        e = e.field(":package: Cargo arguments", cargo_args_msg, false);
     }
 
-    e.field(
+    e = e.field(
         "Address",
         MessageBuilder::new()
-            .push_codeblock_safe(&address, None)
+            .push_codeblock_safe(address, None)
             .build(),
         false,
     );

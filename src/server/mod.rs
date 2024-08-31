@@ -191,20 +191,20 @@ impl Server {
 
         let mut fetch = Command::new("git");
         fetch.current_dir(PathBuf::from("veloren"));
-        fetch.args(&["fetch", "--all"]);
+        fetch.args(["fetch", "--all"]);
 
         let mut checkout = Command::new("git");
         checkout.current_dir(PathBuf::from("veloren"));
-        checkout.args(&["checkout", &rev.to_string(), "-f"]);
+        checkout.args(["checkout", &rev.to_string(), "-f"]);
 
         let mut reset = Command::new("git");
         reset.current_dir(PathBuf::from("veloren"));
         match rev {
             Rev::Branch(branch) => {
-                reset.args(&["reset", "--hard", &format!("origin/{}", branch)]);
+                reset.args(["reset", "--hard", &format!("origin/{}", branch)]);
             }
             Rev::Commit(commit) => {
-                reset.args(&["reset", "--hard", commit]);
+                reset.args(["reset", "--hard", commit]);
             }
         }
 
@@ -262,7 +262,7 @@ impl Server {
         cmd.current_dir(PathBuf::from("veloren"));
         cmd.env_remove("RUSTUP_TOOLCHAIN"); // Clean up env vars during development.
         cmd.arg("build");
-        cmd.args(&["--bin", "veloren-server-cli"]);
+        cmd.args(["--bin", "veloren-server-cli"]);
         cmd.args(cargo_args);
 
         log::info!("Compiling... [{:?}]", cmd);
@@ -290,7 +290,7 @@ impl Server {
         cmd.current_dir(PathBuf::from("veloren"));
         cmd.env_remove("RUSTUP_TOOLCHAIN"); // Clean up env vars during development.
         cmd.arg("run");
-        cmd.args(&["--bin", "veloren-server-cli"]);
+        cmd.args(["--bin", "veloren-server-cli"]);
         cmd.args(cargo_args);
         cmd.arg("--");
         cmd.args(args);

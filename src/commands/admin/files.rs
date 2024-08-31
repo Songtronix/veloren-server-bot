@@ -2,8 +2,9 @@ use crate::discord::Context;
 use crate::discord::Error;
 use anyhow::Context as AnyhowContext;
 use poise::serenity_prelude::Attachment;
-use poise::serenity_prelude::AttachmentType;
+use poise::serenity_prelude::CreateAttachment;
 use poise::serenity_prelude::MessageBuilder;
+use poise::CreateReply;
 use std::path::PathBuf;
 use tokio::io::AsyncWriteExt;
 
@@ -146,7 +147,11 @@ pub async fn view(
         )
         .await?;
     } else if let Err(e) = ctx
-        .send(|m| m.attachment(AttachmentType::Path(&path)).ephemeral(true))
+        .send(
+            CreateReply::default()
+                .attachment(CreateAttachment::path(path).await?)
+                .ephemeral(true),
+        )
         .await
     {
         ctx.say(format!("Failed to send file: {}", e)).await?;
